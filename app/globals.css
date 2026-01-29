@@ -55,71 +55,71 @@
   --radius: 0.625rem;
 
   /* Base */
-  --background: #F3F3F3;
-  --foreground: #0F0704;
+  --background: #f3f3f3;
+  --foreground: #0f0704;
 
   /* Brand */
-  --primary: #FF7F51;
-  --primary-foreground: #0F0704;
+  --primary: #ff7f51;
+  --primary-foreground: #0f0704;
 
-  --secondary: #FF5151;
-  --secondary-foreground: #0F0704;
+  --secondary: #ff5151;
+  --secondary-foreground: #0f0704;
 
-  --accent: #8A65D1;
-  --accent-foreground: #FFFFFF;
+  --accent: #8a65d1;
+  --accent-foreground: #ffffff;
 
   /* LogIn Colors */
-  --login-title: #4F000B ;
-  --login-input-border: #656565 ;
-  --login-input-ring: #4F000B;
+  --login-title: #4f000b;
+  --login-input-border: #656565;
+  --login-input-ring: #720026;
 
   /* UI */
-  --card: #FFFFFF;
-  --card-foreground: #0F0704;
+  --card: #ffffff;
+  --card-foreground: #0f0704;
 
-  --popover: #FFFFFF;
-  --popover-foreground: #0F0704;
+  --popover: #ffffff;
+  --popover-foreground: #0f0704;
 
-  --muted: #F1EAE7;
-  --muted-foreground: #6B5F5A;
+  --muted: #f1eae7;
+  --muted-foreground: #6b5f5a;
 
-  --destructive: #E5484D;
+  --destructive: #e5484d;
 
-  --border: #E5DCD8;
-  --input: #E5DCD8;
-  --ring: #FF7F51;
+  --border: #e5dcd8;
+  --input: #e5dcd8;
+  --ring: #ff7f51;
 }
 
 /* ============================= */
 /* Dark Theme                    */
 /* ============================= */
 .dark {
-  --background: #0F0704;
-  --foreground: #FCF6F4;
+  --background: #0f0704;
+  --foreground: #fcf6f4;
 
-  --card: #1A1311;
-  --card-foreground: #FCF6F4;
+  --card: #1a1311;
+  --card-foreground: #fcf6f4;
 
-  --popover: #1A1311;
-  --popover-foreground: #FCF6F4;
+  --popover: #1a1311;
+  --popover-foreground: #fcf6f4;
 
-  --primary: #FF7F51;
-  --primary-foreground: #0F0704;
+  --primary: #ff7f51;
+  --primary-foreground: #0f0704;
 
-  --secondary: #FF5151;
-  --secondary-foreground: #0F0704;
+  --secondary: #ff5151;
+  --secondary-foreground: #0f0704;
 
-  --accent: #8A65D1;
-  --accent-foreground: #FFFFFF;
+  --accent: #8a65d1;
+  --accent-foreground: #ffffff;
 
-  --muted: #2A1F1C;
-  --muted-foreground: #B9AFAA;
+  --muted: #2a1f1c;
+  --muted-foreground: #b9afaa;
 
-  --destructive: #FF6B6B;
+  --destructive: #ff6b6b;
 
-  --border: #2A1F1C;
-  --input: #2A1F1C;
-  --ring: #FF7F51;
+  --border: #2a1f1c;
+  --input: #2a1f1c;
+  --ring: #ff7f51;
 }
 
 /* ============================= */
