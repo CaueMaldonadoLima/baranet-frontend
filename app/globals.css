@@ -29,6 +29,10 @@
   --color-login-button-border: var(--login-button-border);
   --color-login-button-bg: var(--login-button-bg);
 
+  --color-login-checkbox: var(--login-checkbox);
+  --color-login-help-text: var(--login-help-text);
+  /* Log In  end*/
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
 
@@ -81,6 +85,9 @@
 
   --login-button-border: #656565;
   --login-button-bg: #720026;
+
+  --login-checkbox: #720026;
+  --login-help-text: #ff7f51;
 
   /* UI */
   --card: #ffffff;
