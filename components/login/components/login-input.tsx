@@ -17,6 +17,7 @@ const LoginInput = ({
         "border border-login-input-border",
         "focus-visible:border-login-input-ring",
         "focus-visible:ring-login-input-ring/50",
+        "selection:bg-login-input-ring selection:text-white",
       )}
       id={id}
       placeholder={placeholder}

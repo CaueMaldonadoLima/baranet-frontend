@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import LoginInput from "@/components/login/components/login-input";
 import { InputField } from "@/components/primitives/input-field";
@@ -30,14 +30,8 @@ export default function LogIn() {
         )}
       >
         {/* Logo / Imagem */}
-        <div
-          className={cn(
-            "h-full w-[43.4%]",
-            "bg-[#FF7F51]",
-          )}
-        >
-          .
-          {/* logo / imagem / ilustração */}
+        <div className={cn("h-full w-[43.4%]", "bg-[#FF7F51]")}>
+          .{/* logo / imagem / ilustração */}
         </div>
 
         {/* Login Form */}
@@ -49,28 +43,15 @@ export default function LogIn() {
             "gap-4 p-12",
           )}
         >
-          <h1 className="text-login-title font-normal text-[2.6rem]">
-            Login
-          </h1>
-          <div className="flex flex-col gap-4">
-            <LoginInput
-              id="id"
-              placeholder="Identificador"
-            />
-            <LoginInput
-              id="user-number"
-              placeholder="Usuário"
-            />
-            <LoginInput
-              id="password"
-              placeholder="Senha"
-              type="password"
-            />
+          <h1 className="text-login-title font-normal text-[2.6rem]">Login</h1>
+          <div className="flex flex-col gap-4 flex items-center">
+            <LoginInput id="id" placeholder="Identificador" />
+            <LoginInput id="user-number" placeholder="Usuário" />
+            <LoginInput id="password" placeholder="Senha" type="password" />
+            <Button variant="login" size="login">
+              Entrar
+            </Button>
           </div>
-
-          <Button className="w-full">
-            Entrar
-          </Button>
         </div>
       </div>
     </div>
