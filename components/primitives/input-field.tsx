@@ -16,6 +16,7 @@ export const InputField: FC<InputFieldProps> = ({
   label, 
   placeholder,
   type = "text",
+  ...props
 }) => {
   return (
     <Field>
@@ -24,6 +25,7 @@ export const InputField: FC<InputFieldProps> = ({
         id={id}
         type={type}
         placeholder={placeholder}
+        {...props}
       />
       {description && 
         <FieldDescription>{description}</FieldDescription>
