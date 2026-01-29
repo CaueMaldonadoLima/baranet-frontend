@@ -20,6 +20,10 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
 
+  --color-login-title: var(--login-title);
+  --color-login-input-border: var(--login-input-border);
+  --color-login-input-ring: var(--login-input-ring);
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
 
@@ -63,6 +67,11 @@
 
   --accent: #8A65D1;
   --accent-foreground: #FFFFFF;
+
+  /* LogIn Colors */
+  --login-title: #4F000B ;
+  --login-input-border: #656565 ;
+  --login-input-ring: #4F000B;
 
   /* UI */
   --card: #FFFFFF;

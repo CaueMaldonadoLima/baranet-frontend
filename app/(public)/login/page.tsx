@@ -1,5 +1,6 @@
 'use client';
 
+import LoginInput from "@/components/login/components/login-input";
 import { InputField } from "@/components/primitives/input-field";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -45,27 +46,25 @@ export default function LogIn() {
             "h-full w-[56.6%]",
             "bg-white",
             "flex flex-col justify-start",
-            "gap-6 p-12",
+            "gap-4 p-12",
           )}
         >
-          <h1 className="text-text font-bold text-4xl">
-            Log In
+          <h1 className="text-login-title font-normal text-[2.6rem]">
+            Login
           </h1>
           <div className="flex flex-col gap-4">
-            <InputField
-              id="email"
-              placeholder="Digite seu email"
-              type="email"
+            <LoginInput
+              id="id"
+              placeholder="Identificador"
             />
-            <InputField
-              id="email"
-              placeholder="Digite seu email"
-              type="email"
+            <LoginInput
+              id="user-number"
+              placeholder="Usuário"
             />
-            <InputField
-              id="email"
-              placeholder="Digite seu email"
-              type="email"
+            <LoginInput
+              id="password"
+              placeholder="Senha"
+              type="password"
             />
           </div>
 
