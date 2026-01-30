@@ -21,7 +21,8 @@ const LoginCheckbox = ({
         onCheckedChange={setChecked}
         className={cn(
           "data-[state=checked]:bg-login-checkbox data-[state=checked]:border-login-checkbox",
-          "data-[state=checked]:text-white rounded-none hover:cursor-pointer",
+          "data-[state=checked]:text-white rounded-none hover:cursor-pointer border-login-checkbox/50",
+          "focus-visible:ring-login-checkbox/50 focus-visible:border-login-checkbox",
         )}
       />
       {label && (
