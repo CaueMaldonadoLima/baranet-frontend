@@ -23,6 +23,7 @@ const buttonVariants = cva(
           "border border-login-button-border rounded-full bg-login-button-bg text-white text-[25px] font-normal leading-none hover:bg-login-button-bg/90 cursor-pointer active:scale-95 transition-transform focus-visible:ring-login-button-bg/50 focus-visible:border-login-button-bg  ",
       },
       size: {
+        welcome: "h-11.5 w-[69.4%] rounded-full px-0 py-0",
         login: "h-11.5 w-[48%] rounded-full px-0 py-0",
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",

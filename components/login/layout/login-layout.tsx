@@ -1,8 +1,11 @@
 "use client";
 import { cn } from "@/lib/utils";
 import LogInForm from "./login-form";
+import WellcomeForm from "./welcome-form";
+import LoginHelpText from "../components/login-help-text";
+import Image from "next/image";
 
-const LogInLayout = () => {
+const LogInLayout = ({ isLogIn = false, user = "Fulano" }) => {
   return (
     <div
       className={cn(
@@ -28,7 +31,33 @@ const LogInLayout = () => {
           .{/* logo / imagem / ilustração */}
         </div>
 
-        <LogInForm />
+        {/* Formulário de Login / Welcome */}
+        <div
+          className={cn(
+            "h-full w-[56.6%]",
+            "bg-white rounded-r-xl",
+            "flex flex-col justify-between items-center",
+            "gap-4 p-12",
+          )}
+        >
+          {isLogIn ? <LogInForm /> : <WellcomeForm user={user} />}
+          <div className="h-9.5 border-t-2 border-black w-full justify-center flex">
+            <div className="mt-6.5 flex flex-row items-center w-[69.4%] justify-between">
+              <div className="flex flex-row gap-0.5 ">
+                <p className="text-[12.5px] text-black text-center">
+                  Precisa de ajuda?
+                </p>
+                <LoginHelpText>Abrir diálogo em nosso Whatsapp.</LoginHelpText>
+              </div>
+              <Image
+                src="/whatsapp-icon.png"
+                alt="Whatsapp Icon"
+                width={29}
+                height={29}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
