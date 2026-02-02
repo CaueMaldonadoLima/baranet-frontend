@@ -33,6 +33,9 @@
   --color-login-help-text: var(--login-help-text);
   /* Log In  end*/
 
+  /* Search Input */
+  --color-search-input-border: var(--search-input-border);
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
 
@@ -88,6 +91,9 @@
 
   --login-checkbox: #720026;
   --login-help-text: #ff7f51;
+
+  /* Search Input */
+  --search-input-border: #4f000b;
 
   /* UI */
   --card: #ffffff;
