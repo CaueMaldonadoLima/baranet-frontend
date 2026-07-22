@@ -22,6 +22,7 @@ interface TopbarProps {
   activeStore?: string;
   onStoreChange?: (storeId: string) => void;
   className?: string;
+  showUserMenu?: boolean;
 }
 
 function UserMenu({ user }: { user: TopbarUser }) {
@@ -139,7 +140,7 @@ function StoreSelector({ stores, activeStore, onStoreChange }: { stores: Store[]
   );
 }
 
-export function Topbar({ user, stores = [], activeStore, onStoreChange, className }: TopbarProps) {
+export function Topbar({ user, stores = [], activeStore, onStoreChange, className, showUserMenu = true }: TopbarProps) {
   const defaultUser: TopbarUser = user ?? { name: "Usuário", email: "usuario@otica.com", role: "Vendedor" };
 
   return (
@@ -150,27 +151,37 @@ export function Topbar({ user, stores = [], activeStore, onStoreChange, classNam
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-3">
-        {stores.length > 1 && (
+      <div className="flex items-center gap-1">
+        {showUserMenu && stores.length > 1 && (
           <StoreSelector stores={stores} activeStore={activeStore} onStoreChange={onStoreChange} />
         )}
 
         <button
           aria-label="Notificações"
-          className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Bell className="size-4" />
-          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />
+          <span className="hidden lg:inline">Notificações</span>
+          <span className="absolute top-1.5 right-1.5 lg:right-2 size-2 rounded-full bg-destructive" />
         </button>
 
         <button
           aria-label="Ajuda"
-          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <HelpCircle className="size-4" />
+          <span className="hidden lg:inline">Ajuda</span>
         </button>
 
-        <UserMenu user={defaultUser} />
+        <button
+          aria-label="Configurações"
+          className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Settings className="size-4" />
+          <span className="hidden lg:inline">Configurações</span>
+        </button>
+
+        {showUserMenu && <UserMenu user={defaultUser} />}
       </div>
     </header>
   );

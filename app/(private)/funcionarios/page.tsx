@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { Badge } from "@/components/shared/badge";
@@ -71,9 +72,11 @@ export default function FuncionariosPage() {
 
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-foreground">Funcionários</h1>
-        <Button>
-          <Users className="size-4" />
-          Novo Funcionário
+        <Button asChild>
+          <Link href="/cadastro">
+            <Users className="size-4" />
+            Novo Funcionário
+          </Link>
         </Button>
       </div>
 

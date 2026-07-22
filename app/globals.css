@@ -36,6 +36,12 @@
   /* Search Input */
   --color-search-input-border: var(--search-input-border);
 
+  /* Sidebar */
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+
   /* Area tokens */
   --color-erp-primary: var(--erp-primary);
   --color-erp-primary-foreground: var(--erp-primary-foreground);
@@ -113,6 +119,12 @@
 
   /* Search Input */
   --search-input-border: #4f000b;
+
+  /* Sidebar */
+  --sidebar-bg: #720026;
+  --sidebar-foreground: #ffffff;
+  --sidebar-active-bg: #ffffff;
+  --sidebar-active-foreground: #720026;
 
   /* UI */
   --card: #ffffff;
