@@ -1,42 +1,75 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Dark mode via class */
 @custom-variant dark (&:is(.dark *));
 
+/* ============================= */
+/* Tailwind Theme Mapping Tokens */
+/* ============================= */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
+
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  /* Log In */
+  --color-login-title: var(--login-title);
+
+  --color-login-input-border: var(--login-input-border);
+  --color-login-input-ring: var(--login-input-ring);
+
+  --color-login-button-border: var(--login-button-border);
+  --color-login-button-bg: var(--login-button-bg);
+
+  --color-login-checkbox: var(--login-checkbox);
+  --color-login-help-text: var(--login-help-text);
+  /* Log In  end*/
+
+  /* Search Input */
+  --color-search-input-border: var(--search-input-border);
+
+  /* Sidebar */
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+
+  /* Area tokens */
+  --color-erp-primary: var(--erp-primary);
+  --color-erp-primary-foreground: var(--erp-primary-foreground);
+  --color-admin-primary: var(--admin-primary);
+  --color-admin-primary-foreground: var(--admin-primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-destructive: var(--destructive);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -46,79 +79,126 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+/* ============================= */
+/* Light Theme (Default)         */
+/* ============================= */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Base */
+  --background: #f3f3f3;
+  --foreground: #0f0704;
+
+  /* Brand */
+  --primary: #ff7f51;
+  --primary-foreground: #0f0704;
+
+  --secondary: #ff5151;
+  --secondary-foreground: #0f0704;
+
+  --accent: #8a65d1;
+  --accent-foreground: #ffffff;
+
+  /* Area Colors */
+  --erp-primary: #047857;
+  --erp-primary-foreground: #ffffff;
+  --admin-primary: #1e40af;
+  --admin-primary-foreground: #ffffff;
+
+  /* LogIn Colors */
+  --login-title: #4f000b;
+
+  --login-input-border: #656565;
+  --login-input-ring: #720026;
+
+  --login-button-border: #656565;
+  --login-button-bg: #720026;
+
+  --login-checkbox: #720026;
+  --login-help-text: #ff7f51;
+
+  /* Search Input */
+  --search-input-border: #4f000b;
+
+  /* Sidebar */
+  --sidebar-bg: #720026;
+  --sidebar-foreground: #ffffff;
+  --sidebar-active-bg: #ffffff;
+  --sidebar-active-foreground: #720026;
+
+  /* UI */
+  --card: #ffffff;
+  --card-foreground: #0f0704;
+
+  --popover: #ffffff;
+  --popover-foreground: #0f0704;
+
+  --muted: #f1eae7;
+  --muted-foreground: #6b5f5a;
+
+  --destructive: #e5484d;
+
+  /* Semantic states */
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+
+  --border: #e5dcd8;
+  --input: #e5dcd8;
+  --ring: #ff7f51;
 }
 
+/* ============================= */
+/* Dark Theme                    */
+/* ============================= */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0f0704;
+  --foreground: #fcf6f4;
+
+  --card: #1a1311;
+  --card-foreground: #fcf6f4;
+
+  --popover: #1a1311;
+  --popover-foreground: #fcf6f4;
+
+  --primary: #ff7f51;
+  --primary-foreground: #0f0704;
+
+  --secondary: #ff5151;
+  --secondary-foreground: #0f0704;
+
+  --accent: #8a65d1;
+  --accent-foreground: #ffffff;
+
+  --muted: #2a1f1c;
+  --muted-foreground: #b9afaa;
+
+  --destructive: #ff6b6b;
+
+  /* Semantic states */
+  --success: #22c55e;
+  --success-foreground: #ffffff;
+  --warning: #fbbf24;
+  --warning-foreground: #0f0704;
+  --info: #60a5fa;
+  --info-foreground: #0f0704;
+
+  --border: #2a1f1c;
+  --input: #2a1f1c;
+  --ring: #ff7f51;
 }
 
+/* ============================= */
+/* Base Styles                   */
+/* ============================= */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
