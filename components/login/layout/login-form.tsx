@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import LoginCheckbox from "../components/login-checkbox";
 import LoginHelpText from "../components/login-help-text";
@@ -7,6 +8,7 @@ import { useState } from "react";
 
 const LogInForm = () => {
   const [keepConnected, setKeepConnected] = useState(true);
+  const router = useRouter();
 
   return (
     <div className="flex flex-col gap-4 items-center w-[69.4%]">
@@ -25,7 +27,7 @@ const LogInForm = () => {
         />
         <LoginHelpText>Esqueceu a senha?</LoginHelpText>
       </div>
-      <Button variant="login" size="login" className="mt-2">
+      <Button variant="login" size="login" className="mt-2" onClick={() => router.push("/")}>
         Entrar
       </Button>
       <div className="flex flex-row gap-0.5">

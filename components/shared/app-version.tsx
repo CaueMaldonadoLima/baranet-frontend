@@ -1,5 +1,14 @@
 import { APP_VERSION } from "@/config/version";
+import { cn } from "@/lib/utils";
 
-export function AppVersion() {
-  return <span className="text-xs text-muted-foreground">{APP_VERSION}</span>;
+interface AppVersionProps {
+  className?: string;
+}
+
+export function AppVersion({ className }: AppVersionProps) {
+  return (
+    <span className={cn("text-xs font-semibold text-white p-2", className)}>
+      {APP_VERSION}
+    </span>
+  );
 }
