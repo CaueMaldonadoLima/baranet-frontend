@@ -20,6 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/components/shared/toast";
+import { customersService, suppliersService } from "@/services/erp";
+import { ApiRequestError } from "@/services/types";
 
 const WEEK_DAYS = ["Todos", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
@@ -78,6 +81,13 @@ const FILA_OPCOES = [
 ];
 
 export default function CadastroPage() {
+  const toast = useToast();
+
+  const [nomeFantasia, setNomeFantasia] = useState("");
+  const [razaoSocial, setRazaoSocial] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [telefone, setTelefone] = useState("");
+
   const [tipoCadastro, setTipoCadastro] = useState("cliente");
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
   const [senhaManual, setSenhaManual] = useState(false);
@@ -108,9 +118,43 @@ export default function CadastroPage() {
     setter((prev) => prev.map((v, i) => (i === index ? !v : v)));
   }
 
-  function handleSave() {
+  async function handleSave() {
+    const name = nomeFantasia.trim() || razaoSocial.trim();
+    if (!name) {
+      toast.warning("Informe ao menos o nome fantasia ou a razão social.");
+      return;
+    }
+
+    if (tipoCadastro === "representante") {
+      toast.info(
+        "Cadastro de representante ainda não disponível",
+        "A API ainda não expõe um endpoint com campos para representantes."
+      );
+      return;
+    }
+
+    const document = cnpj.replace(/\D/g, "") || undefined;
+    const phone = telefone.trim() || undefined;
+
     setLoading(true);
-    setTimeout(() => setLoading(false), 1500);
+    try {
+      if (tipoCadastro === "fornecedor") {
+        await suppliersService.create({ name, cnpj: document, phone });
+        toast.success("Fornecedor cadastrado com sucesso.");
+      } else {
+        await customersService.create({ name, cpf: document, phone });
+        toast.success("Cliente cadastrado com sucesso.");
+      }
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        const firstFieldError = err.errors && Object.values(err.errors)[0]?.[0];
+        toast.error(err.message, firstFieldError);
+      } else {
+        toast.error("Não foi possível salvar o cadastro.", "Verifique sua conexão e tente novamente.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -149,11 +193,19 @@ export default function CadastroPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">CNPJ</label>
-              <Input placeholder="00.000.000/0001-00" />
+              <Input
+                placeholder="00.000.000/0001-00"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Telefone / Whatsapp</label>
-              <Input placeholder="(00) 00000-0000" />
+              <Input
+                placeholder="(00) 00000-0000"
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">DDD</label>
@@ -173,11 +225,19 @@ export default function CadastroPage() {
             </div>
             <div className="sm:col-span-2 lg:col-span-3 xl:col-span-6 space-y-1.5">
               <label className="text-sm font-medium">Nome fantasia</label>
-              <Input placeholder="Nome de exibição do usuário" />
+              <Input
+                placeholder="Nome de exibição do usuário"
+                value={nomeFantasia}
+                onChange={(e) => setNomeFantasia(e.target.value)}
+              />
             </div>
             <div className="sm:col-span-2 lg:col-span-3 xl:col-span-6 space-y-1.5">
               <label className="text-sm font-medium">Razão social</label>
-              <Input placeholder="Razão social completa" />
+              <Input
+                placeholder="Razão social completa"
+                value={razaoSocial}
+                onChange={(e) => setRazaoSocial(e.target.value)}
+              />
             </div>
           </div>
         </FormSection>

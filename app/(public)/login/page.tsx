@@ -1,13 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, Lock, User, Store } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function LogInPage() {
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
 
+  // Login segue mockado por enquanto — fora do escopo desta entrega
+  // (que é conectar o /cadastro na API real). O BFF em app/api/auth/*
+  // já está pronto para quando o login entrar em outra entrega.
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -35,17 +40,19 @@ export default function LogInPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="user" className="text-sm font-medium text-white/80">
-                Usuário
+              <label htmlFor="email" className="text-sm font-medium text-white/80">
+                E-mail
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/40 pointer-events-none" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/40 pointer-events-none" />
                 <input
-                  id="user"
-                  type="text"
+                  id="email"
+                  type="email"
                   required
                   autoComplete="username"
-                  placeholder="seu.usuario"
+                  placeholder="seu.email@otica.com.br"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/30 pl-10 pr-4 py-2.5 text-sm outline-none focus:border-white/50 focus:bg-white/15 transition-colors"
                 />
               </div>
@@ -63,6 +70,8 @@ export default function LogInPage() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/30 pl-10 pr-10 py-2.5 text-sm outline-none focus:border-white/50 focus:bg-white/15 transition-colors"
                 />
                 <button
