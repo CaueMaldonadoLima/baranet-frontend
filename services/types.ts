@@ -197,11 +197,19 @@ export interface CreateSaleDTO {
 }
 export interface CreateCustomerDTO {
   name: string;
-  cpf: string;
-  phone: string;
-  email: string;
-  city: string;
-  state: string;
+  cpf?: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  state?: string;
+}
+export interface CreateSupplierDTO {
+  name: string;
+  cnpj?: string;
+  contact?: string;
+  phone?: string;
+  email?: string;
+  category?: string;
 }
 
 // Erro de rede ou parse
