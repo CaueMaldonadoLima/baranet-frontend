@@ -1,6 +1,9 @@
 import { ApiRequestError } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+// Mesma origem: o browser fala com os route handlers em app/api/**,
+// que fazem o proxy server-side para a API real do Baranet (o token
+// da aplicação nunca pode chegar ao browser — ver lib/server/baranet.ts).
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
