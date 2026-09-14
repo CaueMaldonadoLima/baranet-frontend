@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Clock, List, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -87,6 +87,43 @@ export default function CadastroPage() {
   const [razaoSocial, setRazaoSocial] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [pessoa, setPessoa] = useState("juridica");
+  const [ddd, setDdd] = useState("");
+  const [status, setStatus] = useState("ativo");
+
+  const [inscricaoEstadual, setInscricaoEstadual] = useState("");
+  const [cfopEntradaEstoque, setCfopEntradaEstoque] = useState("");
+  const [regimeTributario, setRegimeTributario] = useState("simples");
+  const [nossoCodigoCompras, setNossoCodigoCompras] = useState("");
+  const [site, setSite] = useState("");
+
+  const [enderecoFornecedor, setEnderecoFornecedor] = useState({
+    cep: "",
+    uf: "",
+    tipo: "comercial",
+    bairro: "",
+    pais: "Brasil",
+    cidade: "",
+    logradouro: "",
+    numero: "",
+    complemento: "",
+  });
+
+  const [entregaFornecedor, setEntregaFornecedor] = useState({
+    rastreio: "",
+    motorista: "",
+    solicitadoPor: "",
+    retirada: false,
+    entrega: true,
+  });
+
+  function handleEnderecoFornecedorChange(e: ChangeEvent<HTMLInputElement>) {
+    setEnderecoFornecedor((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  function handleEntregaFornecedorChange(e: ChangeEvent<HTMLInputElement>) {
+    setEntregaFornecedor((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  }
 
   const [tipoCadastro, setTipoCadastro] = useState("cliente");
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
@@ -181,7 +218,7 @@ export default function CadastroPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Pessoa</label>
-              <Select>
+              <Select value={pessoa} onValueChange={setPessoa}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -200,6 +237,15 @@ export default function CadastroPage() {
               />
             </div>
             <div className="space-y-1.5">
+              <label className="text-sm font-medium">DDD</label>
+              <Input
+                placeholder="11"
+                maxLength={2}
+                value={ddd}
+                onChange={(e) => setDdd(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
               <label className="text-sm font-medium">Telefone / Whatsapp</label>
               <Input
                 placeholder="(00) 00000-0000"
@@ -208,12 +254,8 @@ export default function CadastroPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">DDD</label>
-              <Input placeholder="11" maxLength={2} />
-            </div>
-            <div className="space-y-1.5">
               <label className="text-sm font-medium">Status</label>
-              <Select defaultValue="ativo">
+              <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -239,9 +281,164 @@ export default function CadastroPage() {
                 onChange={(e) => setRazaoSocial(e.target.value)}
               />
             </div>
+
+            {tipoCadastro === "fornecedor" && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Inscrição Estadual</label>
+                  <Input
+                    placeholder="Inscrição Estadual"
+                    value={inscricaoEstadual}
+                    onChange={(e) => setInscricaoEstadual(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    CFOP Default na entrada de estoque
+                  </label>
+                  <Input
+                    placeholder="Ex: 1102"
+                    value={cfopEntradaEstoque}
+                    onChange={(e) => setCfopEntradaEstoque(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Regime Tributário</label>
+                  <Select value={regimeTributario} onValueChange={setRegimeTributario}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simples">Simples Nacional</SelectItem>
+                      <SelectItem value="presumido">Lucro Presumido</SelectItem>
+                      <SelectItem value="real">Lucro Real</SelectItem>
+                      <SelectItem value="mei">MEI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Nosso código de compras</label>
+                  <Input
+                    placeholder="Código utilizado junto a este fornecedor"
+                    value={nossoCodigoCompras}
+                    onChange={(e) => setNossoCodigoCompras(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Site</label>
+                  <Input
+                    type="url"
+                    placeholder="https://"
+                    value={site}
+                    onChange={(e) => setSite(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </FormSection>
         </Card>
+
+        {tipoCadastro === "fornecedor" && (
+          <Card className="px-6">
+            <FormSection title="Endereço" description="Endereço comercial do fornecedor.">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">CEP</label>
+                  <Input
+                    name="cep"
+                    placeholder="00000-000"
+                    maxLength={9}
+                    value={enderecoFornecedor.cep}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">UF</label>
+                  <Input
+                    name="uf"
+                    placeholder="SP"
+                    maxLength={2}
+                    value={enderecoFornecedor.uf}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Tipo</label>
+                  <Select
+                    value={enderecoFornecedor.tipo}
+                    onValueChange={(value) =>
+                      setEnderecoFornecedor((prev) => ({ ...prev, tipo: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="comercial">Comercial</SelectItem>
+                      <SelectItem value="cobranca">Cobrança</SelectItem>
+                      <SelectItem value="entrega">Entrega</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">País</label>
+                  <Input
+                    name="pais"
+                    placeholder="Brasil"
+                    value={enderecoFornecedor.pais}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Cidade</label>
+                  <Input
+                    name="cidade"
+                    placeholder="Cidade"
+                    value={enderecoFornecedor.cidade}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Bairro</label>
+                  <Input
+                    name="bairro"
+                    placeholder="Bairro"
+                    value={enderecoFornecedor.bairro}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="text-sm font-medium">Logradouro</label>
+                  <Input
+                    name="logradouro"
+                    placeholder="Rua, avenida..."
+                    value={enderecoFornecedor.logradouro}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Número</label>
+                  <Input
+                    name="numero"
+                    placeholder="Número"
+                    value={enderecoFornecedor.numero}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4 space-y-1.5">
+                  <label className="text-sm font-medium">Complemento</label>
+                  <Input
+                    name="complemento"
+                    placeholder="Complemento"
+                    value={enderecoFornecedor.complemento}
+                    onChange={handleEnderecoFornecedorChange}
+                  />
+                </div>
+              </div>
+            </FormSection>
+          </Card>
+        )}
 
         <Card className="px-6">
         <FormSection
@@ -279,6 +476,65 @@ export default function CadastroPage() {
           </div>
         </FormSection>
         </Card>
+
+        {tipoCadastro === "fornecedor" && (
+          <Card className="px-6">
+            <FormSection
+              title="Fornecedor de entregas"
+              description="Configurações de rastreio e logística das entregas deste fornecedor."
+            >
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Rastreio</label>
+                  <Input
+                    name="rastreio"
+                    placeholder="Código ou link de rastreio"
+                    value={entregaFornecedor.rastreio}
+                    onChange={handleEntregaFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Motorista</label>
+                  <Input
+                    name="motorista"
+                    placeholder="Nome do motorista"
+                    value={entregaFornecedor.motorista}
+                    onChange={handleEntregaFornecedorChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Solicitado por</label>
+                  <Input
+                    name="solicitadoPor"
+                    placeholder="Responsável pela solicitação"
+                    value={entregaFornecedor.solicitadoPor}
+                    onChange={handleEntregaFornecedorChange}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-6">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <Checkbox
+                    checked={entregaFornecedor.retirada}
+                    onCheckedChange={(checked) =>
+                      setEntregaFornecedor((prev) => ({ ...prev, retirada: checked === true }))
+                    }
+                  />
+                  <span className="text-sm text-foreground">Retirada</span>
+                </label>
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <Checkbox
+                    checked={entregaFornecedor.entrega}
+                    onCheckedChange={(checked) =>
+                      setEntregaFornecedor((prev) => ({ ...prev, entrega: checked === true }))
+                    }
+                  />
+                  <span className="text-sm text-foreground">Entrega</span>
+                </label>
+              </div>
+            </FormSection>
+          </Card>
+        )}
 
         <Card className="px-6">
         <FormSection
