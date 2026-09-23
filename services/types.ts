@@ -137,6 +137,10 @@ export interface LabOrder {
 }
 export interface Supplier {
   id: number;
+  /** Pessoa por trás do papel fornecedor (ver Person) */
+  personId: number;
+  /** Status do papel fornecedor — independe do status da Pessoa */
+  status?: "ativo" | "inativo";
   name: string;
   cnpj: string;
   contact: string;

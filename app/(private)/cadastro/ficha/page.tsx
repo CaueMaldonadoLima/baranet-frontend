@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AlertCircle, Columns3, List, Plus, Save, Search } from "lucide-react";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -21,8 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/shared/badge";
-import { peopleService } from "@/services/erp";
-import { ApiRequestError, type Person, type PersonRole } from "@/services/types";
+import { peopleService, suppliersService } from "@/services/erp";
+import { ApiRequestError, type Person, type PersonRole, type Supplier } from "@/services/types";
 
 // Abas da ficha. Cada uma é um papel sobre a mesma Pessoa (GET /people?role=)
 // — ver ADR 0002. Financeiro não é papel: na API é visão operacional de
@@ -93,6 +93,12 @@ const ANOS = Array.from({ length: 5 }, (_, i) => String(ANO_ATUAL - i));
 
 const formatBRL = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function mensagemDeErro(err: unknown) {
+  return err instanceof ApiRequestError
+    ? err.message
+    : "Verifique sua conexão e tente novamente.";
+}
 
 function lerColunasSalvas(): ColunaOs[] | null {
   try {
@@ -266,6 +272,106 @@ function FichaCliente({ cliente }: { cliente: Person }) {
   );
 }
 
+// Sub-detalhes da ficha do fornecedor (telas seguintes do protótipo XD).
+const SUBABAS_FORNECEDOR = [
+  { value: "pedidos", label: "Pedidos" },
+  { value: "garantia", label: "Em garantia" },
+  { value: "financeiro", label: "Financeiro" },
+  { value: "fiscal", label: "Fiscal" },
+  { value: "marcas", label: "Marcas" },
+] as const;
+
+type EstadoFornecedor =
+  | { status: "carregando" }
+  | { status: "erro"; mensagem: string }
+  | { status: "ok"; fornecedor: Supplier };
+
+// Montado com key={supplierId}: trocar de pessoa remonta e recarrega.
+function FichaFornecedor({ supplierId }: { supplierId: number }) {
+  const [estado, setEstado] = useState<EstadoFornecedor>({ status: "carregando" });
+  const [tentativa, setTentativa] = useState(0);
+
+  useEffect(() => {
+    let ativo = true;
+    suppliersService
+      .get(supplierId)
+      .then((fornecedor) => {
+        if (ativo) setEstado({ status: "ok", fornecedor });
+      })
+      .catch((err) => {
+        if (!ativo) return;
+        setEstado({ status: "erro", mensagem: mensagemDeErro(err) });
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [supplierId, tentativa]);
+
+  const columns: Column<Supplier>[] = [
+    { header: "Código fornecedor", accessor: "id", className: "w-40" },
+    {
+      header: "Status",
+      cell: (row) =>
+        row.status ? (
+          <Badge variant={row.status === "ativo" ? "success" : "muted"}>
+            {row.status === "ativo" ? "Ativo" : "Inativo"}
+          </Badge>
+        ) : (
+          "—"
+        ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {estado.status === "erro" ? (
+        <EmptyState
+          icon={AlertCircle}
+          title="Não foi possível carregar o fornecedor"
+          description={estado.mensagem}
+          action={{
+            label: "Tentar novamente",
+            onClick: () => {
+              setEstado({ status: "carregando" });
+              setTentativa((t) => t + 1);
+            },
+          }}
+          className="rounded-lg border border-border py-12"
+        />
+      ) : (
+        <DataTable
+          data={estado.status === "ok" ? [estado.fornecedor] : []}
+          columns={columns}
+          keyExtractor={(row) => row.id}
+          isLoading={estado.status === "carregando"}
+        />
+      )}
+
+      {/* A tabela é o ponto de entrada: sub-abas só com o fornecedor carregado. */}
+      {estado.status === "ok" && (
+        <Tabs defaultValue="pedidos">
+          <TabsList className="w-fit flex-wrap">
+            {SUBABAS_FORNECEDOR.map((s) => (
+              <TabsTrigger key={s.value} value={s.value}>
+                {s.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {SUBABAS_FORNECEDOR.map((s) => (
+            <TabsContent key={s.value} value={s.value}>
+              <EmptyState
+                title="Em construção"
+                description={`A sub-aba ${s.label.toLowerCase()} da ficha do fornecedor ainda não foi implementada.`}
+                className="rounded-lg border border-border py-12"
+              />
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
+    </div>
+  );
+}
+
 export default function FichaCadastroPage() {
   const toast = useToast();
 
@@ -312,11 +418,7 @@ export default function FichaCadastroPage() {
       if (buscaId !== ultimaBuscaId.current) return;
       setResultados([]);
       setTotalPages(1);
-      setErroBusca(
-        err instanceof ApiRequestError
-          ? err.message
-          : "Verifique sua conexão e tente novamente."
-      );
+      setErroBusca(mensagemDeErro(err));
     } finally {
       if (buscaId === ultimaBuscaId.current) setLoading(false);
     }
@@ -578,6 +680,16 @@ export default function FichaCadastroPage() {
                 />
               ) : a.value === "cliente" ? (
                 <FichaCliente cliente={selecionado} />
+              ) : a.value === "fornecedor" ? (
+                selecionado.supplierId !== null ? (
+                  <FichaFornecedor key={selecionado.supplierId} supplierId={selecionado.supplierId} />
+                ) : (
+                  <EmptyState
+                    icon={AlertCircle}
+                    title="Cadastro de fornecedor não encontrado"
+                    description="A pessoa tem o papel fornecedor, mas a API não informou o código do fornecedor."
+                  />
+                )
               ) : (
                 <EmptyState
                   title="Em construção"
