@@ -3,6 +3,14 @@
 > **Para:** Dev Backend  
 > **Contexto:** Frontend Next.js já implementado com mock data. Este documento descreve todos os endpoints, formatos de request/response e comportamentos necessários para a integração.
 
+> **Fonte de verdade da API real (2026-09-23):** a documentação Swagger em
+> https://baranet-admin.gustavogogola.com.br/api/docs (OpenAPI 1.4.0,
+> `…/api/docs/openapi.yaml`). A API real usa rotas `/v1/oticas/{optica}/…`, e não
+> as rotas `/erp/…` propostas abaixo. O browser nunca a chama direto: passa pelos
+> proxies em `app/api/**` (ver `lib/server/baranet.ts`). Quando este documento
+> divergir do Swagger, vale o Swagger. As seções de cadastro (7, 14, 15 e 7-A)
+> já foram atualizadas; as demais ainda descrevem o contrato proposto originalmente.
+
 ---
 
 ## Padrões globais
@@ -251,30 +259,48 @@ O backend envia email de primeiro acesso automaticamente.
 
 ---
 
+## 7-A. ERP — Pessoas (cadastro unificado)
+
+`people` é o cadastro-base (nome, documento, endereço). Cliente, fornecedor,
+funcionário, médico/optometrista e convênio são **papéis** ligados a uma Pessoa
+por `personId`. Um papel é anexado a uma pessoa existente enviando `{ "personId": <id> }`
+no POST do papel (ex: "Salvar como fornecedor" = `POST /suppliers` com `personId`).
+
+### `GET /v1/oticas/{optica}/people` — proxy `GET /api/people`
+Grid da ficha "Cadastro Pessoa Física e Jurídica" (tela 03/18).
+**Query params:** `page`, `per_page` (máx. 100), `search` (busca ampla), `name`
+(Nome/Código), `document` (CPF/CNPJ, máscara ignorada), `whatsapp` (do papel
+cliente, máscara ignorada), `status` (`ativo|inativo`), `role`
+(`customer|supplier|employee|doctor|agreement|without_supplier|without_customer`).
+- As abas da ficha correspondem a `role`. A aba FINANCEIRO não é papel (é visão de saldos).
+- Os filtros OS/NF da ficha pertencem ao futuro módulo de OS e **não** filtram `people`.
+
+**Objeto `Person`** (resumo; o schema completo está no Swagger):
+```json
+{
+  "id": 4, "code": 4, "personType": "fisica|juridica",
+  "name": "string", "tradeName": null, "document": null,
+  "whatsapp": null, "phone": null, "email": null, "status": "ativo",
+  "address": { "zip": null, "state": null, "city": null, "...": null },
+  "roles": ["customer"],
+  "roleFlags": { "customer": true, "supplier": false, "employee": false, "doctor": false, "agreement": false },
+  "customerId": 4, "supplierId": null, "employeeId": null, "doctorId": null, "agreementId": null
+}
+```
+
+### `GET /v1/oticas/{optica}/people/{person}` — proxy `GET /api/people/{id}`
+
+---
+
 ## 7. ERP — Clientes
 
-### `GET /erp/customers`
-**Query params:** `page`, `search`
-```json
-{
-  "data": [{
-    "id": 1, "name": "string", "cpf": "string",
-    "phone": "string", "email": "string",
-    "city": "string", "state": "string",
-    "lastPurchase": "2026-05-10", "totalPurchases": 5, "totalValue": 2350
-  }]
-}
-```
-
-### `GET /erp/customers/{id}` / `POST /erp/customers` / `PUT /erp/customers/{id}`
-
-**POST/PUT Request:**
-```json
-{
-  "name": "string", "cpf": "string", "phone": "string",
-  "email": "string", "city": "string", "state": "string"
-}
-```
+### `GET/POST /v1/oticas/{optica}/customers` · `GET/PUT/DELETE …/customers/{customer}`
+Papel cliente sobre `people`. **Query params do GET:** `page`, `per_page`, `search`.
+O objeto `Customer` real é bem maior que o proposto originalmente: traz `personId`,
+`roles`, `document`, `whatsapp`, dados pessoais (RG, nascimento, estado civil…),
+`socialNetworks` e `address`. O payload de escrita `CustomerWrite` aceita os
+campos da tela 02/18. O legado `name` + `cpf` ainda funciona. Ver os schemas
+`Customer` e `CustomerWrite` no Swagger.
 
 ---
 
@@ -438,31 +464,26 @@ O backend envia email de primeiro acesso automaticamente.
 
 ## 14. ERP — Fornecedores
 
-### `GET /erp/suppliers` / `POST /erp/suppliers` / `PUT /erp/suppliers/{id}`
-
-**Objeto:**
-```json
-{
-  "id": 1, "name": "string", "cnpj": "string",
-  "contact": "string", "phone": "string", "email": "string",
-  "category": "string", "lastOrder": "string", "totalOrders": 24
-}
-```
+### `GET/POST /v1/oticas/{optica}/suppliers` · `GET/PUT/DELETE …/suppliers/{supplier}`
+Papel fornecedor sobre `people`, com payload expandido (schemas `Supplier` e
+`SupplierWrite` no Swagger: e-mails, laboratórios, blocos de produto etc.).
+Marcas do fornecedor: `GET/POST …/suppliers/{supplier}/brands` e
+`PUT/PATCH/DELETE …/suppliers/{supplier}/brands/{brand}`.
 
 ---
 
-## 15. ERP — Funcionários
+## 15. ERP — Funcionários, médicos, convênios, marcas e representantes
 
-### `GET /erp/employees` / `POST /erp/employees` / `PUT /erp/employees/{id}`
+| Recurso | Rotas (`/v1/oticas/{optica}/…`) | Aba da ficha |
+|---|---|---|
+| Funcionários (usuários do ERP) | `GET/POST employees`. Sem senha, o POST devolve `firstAccessToken` uma vez | USUÁRIO |
+| Médicos / optometristas | `GET/POST doctors` · `GET/PUT/PATCH/DELETE doctors/{doctor}` | MÉDICO / OPTOMETRISTA |
+| Convênios | `GET/POST agreements` · `GET/PUT/PATCH/DELETE agreements/{agreement}` | CONVÊNIO |
+| Marcas | `GET/POST brands` · `GET/PUT/PATCH/DELETE brands/{brand}` | MARCAS (telas 16–17) |
+| Representantes | `GET/POST representatives` | tela 18 |
 
-**Objeto:**
-```json
-{
-  "id": 1, "name": "string", "role": "gerente|vendedor|optometrista|caixa",
-  "email": "string", "phone": "string", "store": "string",
-  "status": "ativo|inativo", "commission": 5, "sales": 42
-}
-```
+Funcionários, médicos e convênios são papéis sobre `people` e aceitam `personId`. Marcas e representantes não são papéis de `people`: o Swagger descreve representantes como "representantes comerciais de marca/fornecedor" e ainda não documenta o schema deles. O frontend
+ainda não tem proxy em `app/api/` para eles. Criar um proxy quando a tela correspondente for implementada.
 
 ---
 
