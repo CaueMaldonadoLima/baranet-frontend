@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AlertCircle, Columns3, List, Plus, Save, Search } from "lucide-react";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -20,46 +20,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { customersService, suppliersService } from "@/services/erp";
-import { ApiRequestError } from "@/services/types";
+import { Badge } from "@/components/shared/badge";
+import { peopleService } from "@/services/erp";
+import { ApiRequestError, type Person, type PersonRole } from "@/services/types";
 
-// Abas da ficha. Só Cliente e Fornecedor têm endpoint de busca hoje; as
-// demais aparecem no protótipo XD (tela 03/18) mas a API ainda não as expõe.
-// Cada aba busca no seu próprio recurso: a unificação por Pessoa (mesmo
-// CPF/CNPJ em várias abas) não é simulada no cliente — ver ADR 0001.
+// Abas da ficha. Cada uma é um papel sobre a mesma Pessoa (GET /people?role=)
+// — ver ADR 0002. Financeiro não é papel: na API é visão operacional de
+// saldos, então a aba busca em todas as pessoas.
 const ABAS = [
-  { value: "cliente", label: "Cliente", temBusca: true },
-  { value: "fornecedor", label: "Fornecedor", temBusca: true },
-  { value: "usuario", label: "Usuário", temBusca: false },
-  { value: "financeiro", label: "Financeiro", temBusca: false },
-  { value: "medico", label: "Médico / Optometrista", temBusca: false },
-  { value: "convenio", label: "Convênio", temBusca: false },
-] as const;
-
-const SEM_ENDPOINT = "A API ainda não expõe um endpoint para esta aba.";
+  { value: "cliente", label: "Cliente", role: "customer", tipoCadastro: "cliente" },
+  { value: "fornecedor", label: "Fornecedor", role: "supplier", tipoCadastro: "fornecedor" },
+  { value: "usuario", label: "Usuário", role: "employee", tipoCadastro: null },
+  { value: "financeiro", label: "Financeiro", role: null, tipoCadastro: null },
+  { value: "medico", label: "Médico / Optometrista", role: "doctor", tipoCadastro: null },
+  { value: "convenio", label: "Convênio", role: "agreement", tipoCadastro: null },
+] as const satisfies readonly {
+  value: string;
+  label: string;
+  role: PersonRole | null;
+  /** Tipo que /cadastro já sabe abrir via ?tipo= */
+  tipoCadastro: string | null;
+}[];
 
 type Aba = (typeof ABAS)[number]["value"];
 
-// Tipos de cadastro que a tela /cadastro já sabe abrir via ?tipo=.
-const TIPO_CADASTRO_POR_ABA: Partial<Record<Aba, string>> = {
-  cliente: "cliente",
-  fornecedor: "fornecedor",
+const PAPEL_LABEL: Record<PersonRole, string> = {
+  customer: "Cliente",
+  supplier: "Fornecedor",
+  employee: "Usuário",
+  doctor: "Médico",
+  agreement: "Convênio",
 };
 
-interface Resultado {
-  id: number;
-  nome: string;
-  documento: string;
-  whatsapp: string;
-}
-
+// Cada campo vira um filtro próprio de GET /people (a API ignora máscaras).
 const CAMPOS_BUSCA = [
-  { key: "nome", label: "Nome / Código", placeholder: "Nome ou código" },
-  { key: "documento", label: "CPF / CNPJ", placeholder: "000.000.000-00" },
+  { key: "name", label: "Nome / Código", placeholder: "Nome ou código" },
+  { key: "document", label: "CPF / CNPJ", placeholder: "000.000.000-00" },
   { key: "whatsapp", label: "Whatsapp", placeholder: "(00) 00000-0000" },
 ] as const;
 
 type CampoBusca = (typeof CAMPOS_BUSCA)[number]["key"];
+
+interface Busca {
+  campo: CampoBusca;
+  termo: string;
+}
 
 // Colunas da tabela de OS do cliente, na ordem do protótipo XD.
 const COLUNAS_OS = [
@@ -89,35 +94,6 @@ const ANOS = Array.from({ length: 5 }, (_, i) => String(ANO_ATUAL - i));
 const formatBRL = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-async function buscarCadastros(
-  aba: Aba,
-  search: string,
-  page: number
-): Promise<{ resultados: Resultado[]; totalPages: number }> {
-  if (aba === "cliente") {
-    const res = await customersService.list({ search, page });
-    return {
-      resultados: res.data.map((c) => ({
-        id: c.id,
-        nome: c.name,
-        documento: c.cpf,
-        whatsapp: c.phone,
-      })),
-      totalPages: res.meta?.last_page ?? 1,
-    };
-  }
-  const res = await suppliersService.list({ search, page });
-  return {
-    resultados: res.data.map((s) => ({
-      id: s.id,
-      nome: s.name,
-      documento: s.cnpj,
-      whatsapp: s.phone,
-    })),
-    totalPages: res.meta?.last_page ?? 1,
-  };
-}
-
 function lerColunasSalvas(): ColunaOs[] | null {
   try {
     const raw = localStorage.getItem(COLUNAS_OS_STORAGE_KEY);
@@ -130,7 +106,7 @@ function lerColunasSalvas(): ColunaOs[] | null {
   }
 }
 
-function OrdensServicoCliente({ cliente }: { cliente: Resultado }) {
+function OrdensServicoCliente({ cliente }: { cliente: Person }) {
   const toast = useToast();
   const [ano, setAno] = useState(String(ANO_ATUAL));
   const [situacao, setSituacao] = useState<"pendentes" | "finalizadas">("pendentes");
@@ -233,7 +209,7 @@ function OrdensServicoCliente({ cliente }: { cliente: Resultado }) {
           columns={columns}
           keyExtractor={(row) => row.os}
           emptyTitle={`Nenhuma OS ${situacao === "pendentes" ? "pendente" : "finalizada"} em ${ano}`}
-          emptyDescription={`A API ainda não expõe as ordens de serviço de ${cliente.nome}.`}
+          emptyDescription={`A API ainda não expõe as ordens de serviço de ${cliente.name}.`}
         />
       ) : (
         <EmptyState
@@ -265,7 +241,7 @@ function OrdensServicoCliente({ cliente }: { cliente: Resultado }) {
   );
 }
 
-function FichaCliente({ cliente }: { cliente: Resultado }) {
+function FichaCliente({ cliente }: { cliente: Person }) {
   return (
     <Tabs defaultValue="os">
       <TabsList className="w-fit flex-wrap">
@@ -295,36 +271,45 @@ export default function FichaCadastroPage() {
 
   const [aba, setAba] = useState<Aba>("cliente");
   const [campos, setCampos] = useState<Record<CampoBusca, string>>({
-    nome: "",
-    documento: "",
+    name: "",
+    document: "",
     whatsapp: "",
   });
   const [os, setOs] = useState("");
   const [nf, setNf] = useState("");
 
-  const [termoBuscado, setTermoBuscado] = useState<string | null>(null);
-  const [resultados, setResultados] = useState<Resultado[]>([]);
+  const [busca, setBusca] = useState<Busca | null>(null);
+  const [resultados, setResultados] = useState<Person[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
   const [mostrarResultados, setMostrarResultados] = useState(true);
-  const [selecionado, setSelecionado] = useState<Resultado | null>(null);
+  const [selecionado, setSelecionado] = useState<Person | null>(null);
+  // Trocar de aba refaz a busca: só a resposta da última requisição vale.
+  const ultimaBuscaId = useRef(0);
 
   const abaAtual = ABAS.find((a) => a.value === aba)!;
-  const tipoCadastro = TIPO_CADASTRO_POR_ABA[aba];
 
-  async function executarBusca(termo: string, pagina: number) {
+  async function executarBusca(novaBusca: Busca, pagina: number, abaBusca: Aba = aba) {
+    const role = ABAS.find((a) => a.value === abaBusca)!.role ?? undefined;
+    const buscaId = ++ultimaBuscaId.current;
     setLoading(true);
     setErroBusca(null);
-    setTermoBuscado(termo);
+    setBusca(novaBusca);
     setMostrarResultados(true);
     try {
-      const res = await buscarCadastros(aba, termo, pagina);
-      setResultados(res.resultados);
-      setTotalPages(res.totalPages);
+      const res = await peopleService.list({
+        [novaBusca.campo]: novaBusca.termo,
+        role,
+        page: pagina,
+      });
+      if (buscaId !== ultimaBuscaId.current) return;
+      setResultados(res.data);
+      setTotalPages(res.meta?.last_page ?? 1);
       setPage(pagina);
     } catch (err) {
+      if (buscaId !== ultimaBuscaId.current) return;
       setResultados([]);
       setTotalPages(1);
       setErroBusca(
@@ -333,7 +318,7 @@ export default function FichaCadastroPage() {
           : "Verifique sua conexão e tente novamente."
       );
     } finally {
-      setLoading(false);
+      if (buscaId === ultimaBuscaId.current) setLoading(false);
     }
   }
 
@@ -343,14 +328,7 @@ export default function FichaCadastroPage() {
       toast.warning("Digite algo para buscar.");
       return;
     }
-    if (!abaAtual.temBusca) {
-      toast.info(
-        `Busca de ${abaAtual.label.toLowerCase()} ainda não disponível`,
-        SEM_ENDPOINT
-      );
-      return;
-    }
-    executarBusca(termo, 1);
+    executarBusca({ campo, termo }, 1);
   }
 
   function handleBuscarDocumentoFiscal(tipo: "OS" | "NF", valor: string) {
@@ -364,28 +342,44 @@ export default function FichaCadastroPage() {
     );
   }
 
-  // Trocar de aba troca o recurso buscado; como Cliente e Fornecedor não são
-  // a mesma Pessoa no backend (ADR 0001), a seleção não é levada junto.
+  // A seleção é uma Pessoa, então vale para todas as abas; só a lista de
+  // resultados é refeita com o papel da nova aba.
   function handleTrocarAba(value: string) {
-    setAba(value as Aba);
-    setResultados([]);
-    setTermoBuscado(null);
-    setErroBusca(null);
-    setSelecionado(null);
-    setPage(1);
-    setTotalPages(1);
+    const novaAba = value as Aba;
+    setAba(novaAba);
+    if (busca) executarBusca(busca, 1, novaAba);
   }
 
-  function handleSelecionar(row: Resultado) {
+  function handleSelecionar(row: Person) {
     setSelecionado(row);
     setMostrarResultados(false);
   }
 
-  const colunasResultado: Column<Resultado>[] = [
-    { header: "Código", accessor: "id", className: "w-24" },
-    { header: "Nome", accessor: "nome" },
-    { header: "CPF / CNPJ", cell: (row) => row.documento || "—" },
+  const colunasResultado: Column<Person>[] = [
+    { header: "Código", accessor: "code", className: "w-24" },
+    {
+      header: "Nome",
+      cell: (row) => (
+        <div>
+          <p>{row.name}</p>
+          {row.tradeName && <p className="text-xs text-muted-foreground">{row.tradeName}</p>}
+        </div>
+      ),
+    },
+    { header: "CPF / CNPJ", cell: (row) => row.document || "—" },
     { header: "Whatsapp", cell: (row) => row.whatsapp || "—" },
+    {
+      header: "Papéis",
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.roles.map((role) => (
+            <Badge key={role} variant="muted">
+              {PAPEL_LABEL[role]}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
     {
       header: "",
       className: "w-28 text-right",
@@ -396,6 +390,8 @@ export default function FichaCadastroPage() {
       ),
     },
   ];
+
+  const campoBuscado = busca && CAMPOS_BUSCA.find((c) => c.key === busca.campo)!;
 
   return (
     <div className="px-[4.2vw] py-8 space-y-6">
@@ -472,9 +468,9 @@ export default function FichaCadastroPage() {
             ))}
           </div>
 
-          {tipoCadastro ? (
+          {abaAtual.tipoCadastro ? (
             <Button size="sm" asChild>
-              <Link href={`/cadastro?tipo=${tipoCadastro}`}>
+              <Link href={`/cadastro?tipo=${abaAtual.tipoCadastro}`}>
                 <Plus className="size-3.5" />
                 Incluir novo
               </Link>
@@ -485,7 +481,7 @@ export default function FichaCadastroPage() {
               onClick={() =>
                 toast.info(
                   `Cadastro de ${abaAtual.label.toLowerCase()} ainda não disponível`,
-                  SEM_ENDPOINT
+                  "O formulário deste papel ainda não foi implementado."
                 )
               }
             >
@@ -501,36 +497,39 @@ export default function FichaCadastroPage() {
             variant="ghost"
             aria-label="Mostrar resultados da busca"
             aria-pressed={mostrarResultados}
-            disabled={termoBuscado === null}
+            disabled={busca === null}
             onClick={() => setMostrarResultados((v) => !v)}
           >
             <List className="size-4" />
           </Button>
           <div className="w-28 space-y-1.5">
             <label htmlFor="selecionado-codigo" className="text-sm font-medium">Código</label>
-            <Input id="selecionado-codigo" value={selecionado ? String(selecionado.id) : ""} readOnly placeholder="—" />
+            <Input id="selecionado-codigo" value={selecionado ? String(selecionado.code) : ""} readOnly placeholder="—" />
           </div>
           <div className="min-w-48 flex-1 space-y-1.5">
             <label htmlFor="selecionado-nome" className="text-sm font-medium">Nome</label>
-            <Input id="selecionado-nome" value={selecionado?.nome ?? ""} readOnly placeholder="Nenhum cadastro selecionado" />
+            <Input id="selecionado-nome" value={selecionado?.name ?? ""} readOnly placeholder="Nenhum cadastro selecionado" />
           </div>
           <div className="w-52 space-y-1.5">
             <label htmlFor="selecionado-documento" className="text-sm font-medium">CPF / CNPJ</label>
-            <Input id="selecionado-documento" value={selecionado?.documento ?? ""} readOnly placeholder="—" />
+            <Input id="selecionado-documento" value={selecionado?.document ?? ""} readOnly placeholder="—" />
           </div>
         </div>
 
-        {termoBuscado !== null && mostrarResultados && (
+        {busca !== null && campoBuscado && mostrarResultados && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Resultados em {abaAtual.label.toLowerCase()} para “{termoBuscado}”
+              {abaAtual.role
+                ? `Pessoas com papel ${abaAtual.label.toLowerCase()}`
+                : "Todas as pessoas"}{" "}
+              — {campoBuscado.label}: “{busca.termo}”
             </p>
             {erroBusca ? (
               <EmptyState
                 icon={AlertCircle}
                 title="Não foi possível buscar"
                 description={erroBusca}
-                action={{ label: "Tentar novamente", onClick: () => executarBusca(termoBuscado, page) }}
+                action={{ label: "Tentar novamente", onClick: () => executarBusca(busca, page) }}
                 className="rounded-lg border border-border py-12"
               />
             ) : (
@@ -540,14 +539,14 @@ export default function FichaCadastroPage() {
                 keyExtractor={(row) => row.id}
                 isLoading={loading}
                 emptyTitle="Nenhum cadastro encontrado"
-                emptyDescription="Tente outro termo ou use “Incluir novo”."
+                emptyDescription="Tente outro termo, outra aba ou use “Incluir novo”."
               />
             )}
             {!erroBusca && totalPages > 1 && (
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
-                onPageChange={(p) => executarBusca(termoBuscado, p)}
+                onPageChange={(p) => executarBusca(busca, p)}
               />
             )}
           </div>
@@ -566,23 +565,23 @@ export default function FichaCadastroPage() {
         {ABAS.map((a) => (
           <TabsContent key={a.value} value={a.value}>
             <Card className="px-6">
-              {!a.temBusca ? (
-                <EmptyState
-                  title={`${a.label} ainda não disponível`}
-                  description={SEM_ENDPOINT}
-                />
-              ) : !selecionado ? (
+              {!selecionado ? (
                 <EmptyState
                   icon={Search}
-                  title={`Nenhum ${a.label.toLowerCase()} selecionado`}
+                  title="Nenhum cadastro selecionado"
                   description="Busque pelo nome, código, CPF/CNPJ ou Whatsapp e selecione um resultado."
+                />
+              ) : a.role && !selecionado.roleFlags[a.role] ? (
+                <EmptyState
+                  title={`${selecionado.name} não tem cadastro de ${a.label.toLowerCase()}`}
+                  description="Esta pessoa não possui este papel no cadastro."
                 />
               ) : a.value === "cliente" ? (
                 <FichaCliente cliente={selecionado} />
               ) : (
                 <EmptyState
                   title="Em construção"
-                  description="Os detalhes da ficha do fornecedor ainda não foram implementados."
+                  description={`Os detalhes da aba ${a.label.toLowerCase()} ainda não foram implementados.`}
                 />
               )}
             </Card>

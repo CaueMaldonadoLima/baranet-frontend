@@ -146,6 +146,52 @@ export interface Supplier {
   lastOrder: string;
   totalOrders: number;
 }
+// Pessoa: cadastro-base (nome, documento, endereço) compartilhado pelos
+// papéis. Cliente, fornecedor, funcionário, médico e convênio são papéis
+// ligados a ela por personId (GET /people — ver docs/backend-contract.md).
+export type PersonRole = "customer" | "supplier" | "employee" | "doctor" | "agreement";
+/** `without_*` servem aos pickers de "Salvar como" (pessoas sem o papel). */
+export type PersonRoleFilter = PersonRole | "without_supplier" | "without_customer";
+export interface PersonAddress {
+  zip: string | null;
+  state: string | null;
+  streetType: string | null;
+  neighborhood: string | null;
+  country: string | null;
+  city: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+}
+export interface Person {
+  id: number;
+  /** Código exibido na grid (hoje = id da pessoa) */
+  code: number;
+  personType: "fisica" | "juridica";
+  /** Razão social / nome */
+  name: string;
+  tradeName: string | null;
+  document: string | null;
+  rg: string | null;
+  stateRegistration: string | null;
+  rgOrIe: string | null;
+  ddd: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  status: "ativo" | "inativo";
+  siteUrl: string | null;
+  city: string | null;
+  state: string | null;
+  address: PersonAddress;
+  roles: PersonRole[];
+  roleFlags: Record<PersonRole, boolean>;
+  customerId: number | null;
+  supplierId: number | null;
+  employeeId: number | null;
+  doctorId: number | null;
+  agreementId: number | null;
+}
 export interface Employee {
   id: number;
   name: string;
