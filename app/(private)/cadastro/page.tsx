@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { Camera, Clock, Eye, EyeOff, List, Plus, QrCode, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -117,7 +117,15 @@ const FILA_OPCOES = [
   "Posição na fila definida pelo primeiro a se logar",
 ];
 
-export default function CadastroPage() {
+const TIPOS_CADASTRO = ["cliente", "fornecedor", "representante"];
+
+export default function CadastroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
+  // A ficha de busca (/cadastro/ficha) abre esta tela já no tipo da aba ativa.
+  const { tipo } = use(searchParams);
   const toast = useToast();
 
   const [nomeFantasia, setNomeFantasia] = useState("");
@@ -176,7 +184,9 @@ export default function CadastroPage() {
     setEndereco((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  const [tipoCadastro, setTipoCadastro] = useState("cliente");
+  const [tipoCadastro, setTipoCadastro] = useState(
+    tipo && TIPOS_CADASTRO.includes(tipo) ? tipo : "cliente"
+  );
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
   const [senhaManual, setSenhaManual] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -288,7 +298,7 @@ export default function CadastroPage() {
   function handleAlterar() {
     toast.info(
       "Alteração de cadastro ainda não disponível",
-      `Editar um ${tipoCadastro === "fornecedor" ? "fornecedor" : "cliente"} existente depende de uma tela de busca que ainda não foi implementada.`
+      `Carregar um ${tipoCadastro === "fornecedor" ? "fornecedor" : "cliente"} existente neste formulário ainda não foi implementado. Use a Busca para localizá-lo.`
     );
   }
 
@@ -357,17 +367,11 @@ export default function CadastroPage() {
                   <Camera className="size-3.5" />
                   Foto
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    toast.info(
-                      "Busca de cliente ainda não disponível",
-                      "Depende de uma tela de busca de cadastro que ainda não foi implementada."
-                    )
-                  }
-                >
-                  <Search className="size-3.5" />
-                  Busca
+                <Button size="sm" asChild>
+                  <Link href="/cadastro/ficha">
+                    <Search className="size-3.5" />
+                    Busca
+                  </Link>
                 </Button>
               </div>
               <Button size="sm" onClick={() => qrCodeInputRef.current?.click()}>
