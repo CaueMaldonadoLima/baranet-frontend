@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Clock, List, Plus } from "lucide-react";
+import { Camera, Clock, Eye, EyeOff, List, Plus, QrCode, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { Badge } from "@/components/shared/badge";
@@ -68,6 +68,43 @@ function DiasTrabalho({
   );
 }
 
+const UFS = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
+  "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+];
+
+const CLIENTE_INICIAL = {
+  tipoCliente: "otimo",
+  menorSemCpf: false,
+  rg: "",
+  nascimento: "",
+  sexo: "",
+  estadoCivil: "",
+  natural: "",
+  dddComercial: "",
+  telefoneComercial: "",
+  ramal: "",
+  estrangeiro: false,
+  documentoEstrangeiro: "",
+  emissaoRg: "",
+  orgaoEmissorRg: "",
+  ufRg: "",
+  apelido: "",
+  pais: "Brasil",
+};
+
+const ENDERECO_INICIAL = {
+  cep: "",
+  uf: "",
+  tipo: "comercial",
+  bairro: "",
+  pais: "Brasil",
+  cidade: "",
+  logradouro: "",
+  numero: "",
+  complemento: "",
+};
+
 const FILA_OPCOES = [
   "Iniciado um atendimento, fica o nome do usuário vendedor fixo na venda iniciada, só podendo ser trocado mediante autorização",
   "Definir a fila de atendimento pelo primeiro a se logar",
@@ -80,15 +117,76 @@ const FILA_OPCOES = [
   "Posição na fila definida pelo primeiro a se logar",
 ];
 
-export default function CadastroPage() {
+const TIPOS_CADASTRO = ["cliente", "fornecedor", "representante"];
+
+export default function CadastroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
+  // A ficha de busca (/cadastro/ficha) abre esta tela já no tipo da aba ativa.
+  const { tipo } = use(searchParams);
   const toast = useToast();
 
   const [nomeFantasia, setNomeFantasia] = useState("");
   const [razaoSocial, setRazaoSocial] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [pessoa, setPessoa] = useState("juridica");
+  const [ddd, setDdd] = useState("");
+  const [status, setStatus] = useState("ativo");
 
-  const [tipoCadastro, setTipoCadastro] = useState("cliente");
+  const [inscricaoEstadual, setInscricaoEstadual] = useState("");
+  const [cfopEntradaEstoque, setCfopEntradaEstoque] = useState("");
+  const [regimeTributario, setRegimeTributario] = useState("simples");
+  const [nossoCodigoCompras, setNossoCodigoCompras] = useState("");
+  const [site, setSite] = useState("");
+
+  const [endereco, setEndereco] = useState(ENDERECO_INICIAL);
+
+  const [cliente, setCliente] = useState(CLIENTE_INICIAL);
+  const [fotoCliente, setFotoCliente] = useState<string | null>(null);
+  const [qrCodeCliente, setQrCodeCliente] = useState<string | null>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const qrCodeInputRef = useRef<HTMLInputElement>(null);
+
+  // Libera os object URLs das imagens quando são trocadas ou removidas.
+  useEffect(() => () => { if (fotoCliente) URL.revokeObjectURL(fotoCliente); }, [fotoCliente]);
+  useEffect(() => () => { if (qrCodeCliente) URL.revokeObjectURL(qrCodeCliente); }, [qrCodeCliente]);
+
+  function updateCliente<K extends keyof typeof CLIENTE_INICIAL>(
+    key: K,
+    value: (typeof CLIENTE_INICIAL)[K]
+  ) {
+    setCliente((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleImagemSelecionada(
+    e: ChangeEvent<HTMLInputElement>,
+    setter: (url: string | null) => void
+  ) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.warning("Selecione um arquivo de imagem.");
+      return;
+    }
+    setter(URL.createObjectURL(file));
+  }
+
+  const [tipoRastreioEntrega, setTipoRastreioEntrega] = useState("numero_pedido");
+  const [numeroPedidoEntrega, setNumeroPedidoEntrega] = useState("");
+  const [motoristaEntrega, setMotoristaEntrega] = useState("");
+  const [solicitadoPorEntrega, setSolicitadoPorEntrega] = useState("");
+
+  function handleEnderecoChange(e: ChangeEvent<HTMLInputElement>) {
+    setEndereco((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  const [tipoCadastro, setTipoCadastro] = useState(
+    tipo && TIPOS_CADASTRO.includes(tipo) ? tipo : "cliente"
+  );
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
   const [senhaManual, setSenhaManual] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -119,7 +217,12 @@ export default function CadastroPage() {
   }
 
   async function handleSave() {
-    const name = nomeFantasia.trim() || razaoSocial.trim();
+    // Razão social fica oculta no cadastro de cliente: não usar um valor
+    // digitado antes de trocar o tipo de cadastro.
+    const name =
+      tipoCadastro === "cliente"
+        ? nomeFantasia.trim()
+        : nomeFantasia.trim() || razaoSocial.trim();
     if (!name) {
       toast.warning("Informe ao menos o nome fantasia ou a razão social.");
       return;
@@ -142,8 +245,19 @@ export default function CadastroPage() {
         await suppliersService.create({ name, cnpj: document, phone });
         toast.success("Fornecedor cadastrado com sucesso.");
       } else {
-        await customersService.create({ name, cpf: document, phone });
-        toast.success("Cliente cadastrado com sucesso.");
+        // Os demais campos da tela 02/18 (RG, nascimento, foto etc.) ainda não
+        // existem no contrato de POST /erp/customers (docs/backend-contract.md).
+        await customersService.create({
+          name,
+          cpf: cliente.menorSemCpf ? undefined : document,
+          phone,
+          city: endereco.cidade.trim() || undefined,
+          state: endereco.uf.trim().toUpperCase() || undefined,
+        });
+        toast.success(
+          "Cliente cadastrado com sucesso.",
+          "Foto, QR Code e dados do cadastro completo ainda não são enviados à API."
+        );
       }
     } catch (err) {
       if (err instanceof ApiRequestError) {
@@ -155,6 +269,37 @@ export default function CadastroPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleIncluir() {
+    setNomeFantasia("");
+    setRazaoSocial("");
+    setCnpj("");
+    setTelefone("");
+    setPessoa("juridica");
+    setDdd("");
+    setStatus("ativo");
+    setInscricaoEstadual("");
+    setCfopEntradaEstoque("");
+    setRegimeTributario("simples");
+    setNossoCodigoCompras("");
+    setSite("");
+    setEndereco(ENDERECO_INICIAL);
+    setTipoRastreioEntrega("numero_pedido");
+    setNumeroPedidoEntrega("");
+    setMotoristaEntrega("");
+    setSolicitadoPorEntrega("");
+    setCliente(CLIENTE_INICIAL);
+    setFotoCliente(null);
+    setQrCodeCliente(null);
+    toast.info(`Novo cadastro de ${tipoCadastro === "fornecedor" ? "fornecedor" : "cliente"} iniciado.`);
+  }
+
+  function handleAlterar() {
+    toast.info(
+      "Alteração de cadastro ainda não disponível",
+      `Carregar um ${tipoCadastro === "fornecedor" ? "fornecedor" : "cliente"} existente neste formulário ainda não foi implementado. Use a Busca para localizá-lo.`
+    );
   }
 
   return (
@@ -169,11 +314,180 @@ export default function CadastroPage() {
       <h1 className="text-2xl font-bold tracking-tight">Cadastro</h1>
 
       <div className="w-full space-y-8">
+        {(tipoCadastro === "fornecedor" || tipoCadastro === "cliente") && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={handleIncluir}>
+              Incluir
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleAlterar}>
+              Alterar
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={loading}>
+              {loading ? "Gravando..." : "Gravar"}
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/">Cancelar</Link>
+            </Button>
+          </div>
+        )}
+
         <Card className="px-6">
         <FormSection
           title="Cadastro rápido"
           description="Dados básicos de identificação do usuário."
         >
+          {tipoCadastro === "cliente" ? (
+          <div className="flex flex-col gap-6 md:flex-row">
+            <div className="flex w-full shrink-0 flex-col gap-2 md:w-44">
+              <p className="text-sm font-medium">Dados cadastrais</p>
+              <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border border-input bg-muted/30">
+                {fotoCliente ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- preview local via object URL
+                  <img src={fotoCliente} alt="Foto do cliente" className="size-full object-cover" />
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sem dados</span>
+                )}
+              </div>
+              <input
+                ref={fotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImagemSelecionada(e, setFotoCliente)}
+              />
+              <input
+                ref={qrCodeInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImagemSelecionada(e, setQrCodeCliente)}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" onClick={() => fotoInputRef.current?.click()}>
+                  <Camera className="size-3.5" />
+                  Foto
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/cadastro/ficha">
+                    <Search className="size-3.5" />
+                    Busca
+                  </Link>
+                </Button>
+              </div>
+              <Button size="sm" onClick={() => qrCodeInputRef.current?.click()}>
+                <QrCode className="size-3.5" />
+                Imagem QR Code
+              </Button>
+              {qrCodeCliente && (
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- preview local via object URL */}
+                  <img
+                    src={qrCodeCliente}
+                    alt="QR Code do cliente"
+                    className="size-14 rounded border border-input object-contain"
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setQrCodeCliente(null)}
+                    aria-label="Remover QR Code"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!fotoCliente}
+                onClick={() => setFotoCliente(null)}
+              >
+                Excluir foto do cliente
+              </Button>
+            </div>
+
+            <div className="grid flex-1 content-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1.5 lg:col-span-2">
+                <label className="text-sm font-medium">Código</label>
+                <Input placeholder="Gerado automaticamente" disabled />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">CPF / CNPJ</label>
+                <Input
+                  placeholder={cliente.menorSemCpf ? "Cliente menor sem CPF" : "000.000.000-00"}
+                  value={cliente.menorSemCpf ? "" : cnpj}
+                  onChange={(e) => setCnpj(e.target.value)}
+                  disabled={cliente.menorSemCpf}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Whatsapp</label>
+                <Input
+                  placeholder="(00) 00000-0000"
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+                <label className="text-sm font-medium">Nome fantasia / Razão social</label>
+                <Input
+                  placeholder="Nome completo ou razão social do cliente"
+                  value={nomeFantasia}
+                  onChange={(e) => setNomeFantasia(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Tipo de cliente</label>
+                <Select
+                  value={cliente.tipoCliente}
+                  onValueChange={(value) => updateCliente("tipoCliente", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="otimo">Ótimo</SelectItem>
+                    <SelectItem value="bom">Bom</SelectItem>
+                    <SelectItem value="regular">Regular</SelectItem>
+                    <SelectItem value="ruim">Ruim</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Status</label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Cadastrar como</label>
+                <Select value={tipoCadastro} onValueChange={setTipoCadastro}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="fornecedor">Fornecedor</SelectItem>
+                    <SelectItem value="representante">Representante</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2.5 self-end pb-2">
+                <Checkbox
+                  checked={cliente.menorSemCpf}
+                  onCheckedChange={(checked) => updateCliente("menorSemCpf", checked === true)}
+                />
+                <span className="text-sm text-foreground">Cliente menor sem CPF</span>
+              </label>
+            </div>
+          </div>
+          ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Código</label>
@@ -181,7 +495,7 @@ export default function CadastroPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Pessoa</label>
-              <Select>
+              <Select value={pessoa} onValueChange={setPessoa}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -200,6 +514,15 @@ export default function CadastroPage() {
               />
             </div>
             <div className="space-y-1.5">
+              <label className="text-sm font-medium">DDD</label>
+              <Input
+                placeholder="11"
+                maxLength={2}
+                value={ddd}
+                onChange={(e) => setDdd(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
               <label className="text-sm font-medium">Telefone / Whatsapp</label>
               <Input
                 placeholder="(00) 00000-0000"
@@ -208,12 +531,8 @@ export default function CadastroPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">DDD</label>
-              <Input placeholder="11" maxLength={2} />
-            </div>
-            <div className="space-y-1.5">
               <label className="text-sm font-medium">Status</label>
-              <Select defaultValue="ativo">
+              <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -231,7 +550,7 @@ export default function CadastroPage() {
                 onChange={(e) => setNomeFantasia(e.target.value)}
               />
             </div>
-            <div className="sm:col-span-2 lg:col-span-3 xl:col-span-6 space-y-1.5">
+            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-5 space-y-1.5">
               <label className="text-sm font-medium">Razão social</label>
               <Input
                 placeholder="Razão social completa"
@@ -239,9 +558,359 @@ export default function CadastroPage() {
                 onChange={(e) => setRazaoSocial(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Cadastrar como</label>
+              <Select value={tipoCadastro} onValueChange={setTipoCadastro}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cliente">Cliente</SelectItem>
+                  <SelectItem value="fornecedor">Fornecedor</SelectItem>
+                  <SelectItem value="representante">Representante</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {tipoCadastro === "fornecedor" && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Inscrição Estadual</label>
+                  <Input
+                    placeholder="Inscrição Estadual"
+                    value={inscricaoEstadual}
+                    onChange={(e) => setInscricaoEstadual(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    CFOP Default na entrada de estoque
+                  </label>
+                  <Input
+                    placeholder="Ex: 1102"
+                    value={cfopEntradaEstoque}
+                    onChange={(e) => setCfopEntradaEstoque(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Regime Tributário</label>
+                  <Select value={regimeTributario} onValueChange={setRegimeTributario}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simples">Simples Nacional</SelectItem>
+                      <SelectItem value="presumido">Lucro Presumido</SelectItem>
+                      <SelectItem value="real">Lucro Real</SelectItem>
+                      <SelectItem value="mei">MEI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Nosso código de compras</label>
+                  <Input
+                    placeholder="Código utilizado junto a este fornecedor"
+                    value={nossoCodigoCompras}
+                    onChange={(e) => setNossoCodigoCompras(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Site</label>
+                  <Input
+                    type="url"
+                    placeholder="https://"
+                    value={site}
+                    onChange={(e) => setSite(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
           </div>
+          )}
         </FormSection>
         </Card>
+
+        {tipoCadastro === "cliente" && (
+          <Card className="px-6">
+            <FormSection
+              title="Cadastro completo"
+              description="Documentos e dados pessoais do cliente."
+            >
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">RG</label>
+                  <Input
+                    placeholder="RG"
+                    value={cliente.rg}
+                    onChange={(e) => updateCliente("rg", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Nascimento</label>
+                  <Input
+                    type="date"
+                    value={cliente.nascimento}
+                    onChange={(e) => updateCliente("nascimento", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Sexo</label>
+                  <Select value={cliente.sexo} onValueChange={(value) => updateCliente("sexo", value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="feminino">Feminino</SelectItem>
+                      <SelectItem value="masculino">Masculino</SelectItem>
+                      <SelectItem value="nao_informado">Prefere não informar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4 border-t border-border pt-6">
+                <p className="text-sm font-medium">Dados adicionais</p>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Estado civil</label>
+                    <Select
+                      value={cliente.estadoCivil}
+                      onValueChange={(value) => updateCliente("estadoCivil", value)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                        <SelectItem value="casado">Casado(a)</SelectItem>
+                        <SelectItem value="uniao_estavel">União estável</SelectItem>
+                        <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                        <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Natural</label>
+                    <Input
+                      placeholder="Cidade de nascimento"
+                      value={cliente.natural}
+                      onChange={(e) => updateCliente("natural", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">DDD</label>
+                    <Input
+                      placeholder="11"
+                      maxLength={2}
+                      value={cliente.dddComercial}
+                      onChange={(e) => updateCliente("dddComercial", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Telefone comercial</label>
+                    <Input
+                      placeholder="0000-0000"
+                      value={cliente.telefoneComercial}
+                      onChange={(e) => updateCliente("telefoneComercial", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Ramal</label>
+                    <Input
+                      placeholder="Ramal"
+                      value={cliente.ramal}
+                      onChange={(e) => updateCliente("ramal", e.target.value)}
+                    />
+                  </div>
+
+                  <label className="flex cursor-pointer items-center gap-2.5 sm:col-span-2 lg:col-span-5">
+                    <Checkbox
+                      checked={cliente.estrangeiro}
+                      onCheckedChange={(checked) => updateCliente("estrangeiro", checked === true)}
+                    />
+                    <span className="text-sm text-foreground">Cliente estrangeiro</span>
+                  </label>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Estrangeiro</label>
+                    <Input
+                      placeholder="Passaporte / RNE"
+                      value={cliente.documentoEstrangeiro}
+                      onChange={(e) => updateCliente("documentoEstrangeiro", e.target.value)}
+                      disabled={!cliente.estrangeiro}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Emissão RG</label>
+                    <Input
+                      type="date"
+                      value={cliente.emissaoRg}
+                      onChange={(e) => updateCliente("emissaoRg", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Órgão emissor RG</label>
+                    <Input
+                      placeholder="SSP"
+                      value={cliente.orgaoEmissorRg}
+                      onChange={(e) => updateCliente("orgaoEmissorRg", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">UF</label>
+                    <Select value={cliente.ufRg} onValueChange={(value) => updateCliente("ufRg", value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="UF" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UFS.map((uf) => (
+                          <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Última compra</label>
+                    <Input type="date" disabled title="Preenchido automaticamente pelo sistema" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Data de cadastro</label>
+                    <Input type="date" disabled title="Preenchido automaticamente pelo sistema" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Atualização</label>
+                    <Input type="date" disabled title="Preenchido automaticamente pelo sistema" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Apelido</label>
+                    <Input
+                      placeholder="Como o cliente prefere ser chamado"
+                      value={cliente.apelido}
+                      onChange={(e) => updateCliente("apelido", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">País</label>
+                    <Input
+                      placeholder="Brasil"
+                      value={cliente.pais}
+                      onChange={(e) => updateCliente("pais", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </FormSection>
+          </Card>
+        )}
+
+        {(tipoCadastro === "fornecedor" || tipoCadastro === "cliente") && (
+          <Card className="px-6">
+            <FormSection
+              title="Endereço"
+              description={
+                tipoCadastro === "fornecedor"
+                  ? "Endereço comercial do fornecedor."
+                  : "Endereço do cliente. Cidade e UF são enviadas no cadastro."
+              }
+            >
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">CEP</label>
+                  <Input
+                    name="cep"
+                    placeholder="00000-000"
+                    maxLength={9}
+                    value={endereco.cep}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">UF</label>
+                  <Input
+                    name="uf"
+                    placeholder="SP"
+                    maxLength={2}
+                    value={endereco.uf}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Tipo</label>
+                  <Select
+                    value={endereco.tipo}
+                    onValueChange={(value) =>
+                      setEndereco((prev) => ({ ...prev, tipo: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="comercial">Comercial</SelectItem>
+                      <SelectItem value="cobranca">Cobrança</SelectItem>
+                      <SelectItem value="entrega">Entrega</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Bairro</label>
+                  <Input
+                    name="bairro"
+                    placeholder="Bairro"
+                    value={endereco.bairro}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">País</label>
+                  <Input
+                    name="pais"
+                    placeholder="Brasil"
+                    value={endereco.pais}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Cidade</label>
+                  <Input
+                    name="cidade"
+                    placeholder="Cidade"
+                    value={endereco.cidade}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Logradouro</label>
+                  <Input
+                    name="logradouro"
+                    placeholder="Rua, avenida..."
+                    value={endereco.logradouro}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Número</label>
+                  <Input
+                    name="numero"
+                    placeholder="Número"
+                    value={endereco.numero}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Complemento</label>
+                  <Input
+                    name="complemento"
+                    placeholder="Complemento"
+                    value={endereco.complemento}
+                    onChange={handleEnderecoChange}
+                  />
+                </div>
+              </div>
+            </FormSection>
+          </Card>
+        )}
 
         <Card className="px-6">
         <FormSection
@@ -279,6 +948,55 @@ export default function CadastroPage() {
           </div>
         </FormSection>
         </Card>
+
+        {tipoCadastro === "fornecedor" && (
+          <Card className="px-6">
+            <FormSection
+              title="Fornecedor de entregas"
+              description="Aparece em entregas nas OS ou abre em contas a pagar."
+            >
+              <RadioGroup
+                name="tipoRastreioEntrega"
+                value={tipoRastreioEntrega}
+                onValueChange={setTipoRastreioEntrega}
+                className="flex-row flex-wrap items-center gap-x-6 gap-y-3"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="numero_pedido" />
+                  <Input
+                    placeholder="Nº do Pedido"
+                    className="h-9 w-40"
+                    value={numeroPedidoEntrega}
+                    onChange={(e) => setNumeroPedidoEntrega(e.target.value)}
+                    disabled={tipoRastreioEntrega !== "numero_pedido"}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="motorista" />
+                  <Input
+                    placeholder="Motorista"
+                    className="h-9 w-40"
+                    value={motoristaEntrega}
+                    onChange={(e) => setMotoristaEntrega(e.target.value)}
+                    disabled={tipoRastreioEntrega !== "motorista"}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="solicitado_por" />
+                  <Input
+                    placeholder="Solicitado por"
+                    className="h-9 w-40"
+                    value={solicitadoPorEntrega}
+                    onChange={(e) => setSolicitadoPorEntrega(e.target.value)}
+                    disabled={tipoRastreioEntrega !== "solicitado_por"}
+                  />
+                </div>
+                <RadioGroupItem value="retirada" label="Retirada" />
+                <RadioGroupItem value="entrega" label="Entrega" />
+              </RadioGroup>
+            </FormSection>
+          </Card>
+        )}
 
         <Card className="px-6">
         <FormSection
