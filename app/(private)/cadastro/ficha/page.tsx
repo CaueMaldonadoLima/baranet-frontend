@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { AlertCircle, Columns3, List, Plus, Save, Search } from "lucide-react";
+import { AlertCircle, List, Plus, Search } from "lucide-react";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -12,17 +12,12 @@ import { useToast } from "@/components/shared/toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/shared/badge";
 import { peopleService } from "@/services/erp";
-import { ApiRequestError, type Person, type PersonRole } from "@/services/types";
+import { mensagemDeErro, type Person, type PersonRole } from "@/services/types";
+import { FichaCliente } from "./_components/ficha-cliente";
+import { FichaFornecedor } from "./_components/ficha-fornecedor";
+import { AbaFinanceiro } from "./_components/popup-financeiro";
 
 // Abas da ficha. Cada uma é um papel sobre a mesma Pessoa (GET /people?role=)
 // — ver ADR 0002. Financeiro não é papel: na API é visão operacional de
@@ -64,206 +59,6 @@ type CampoBusca = (typeof CAMPOS_BUSCA)[number]["key"];
 interface Busca {
   campo: CampoBusca;
   termo: string;
-}
-
-// Colunas da tabela de OS do cliente, na ordem do protótipo XD.
-const COLUNAS_OS = [
-  { key: "previsaoEntrega", label: "Previsão de entrega" },
-  { key: "dataEntrega", label: "Data de entrega" },
-  { key: "loja", label: "Loja" },
-  { key: "tipo", label: "Tipo" },
-  { key: "os", label: "OS" },
-  { key: "data", label: "Data" },
-  { key: "codigoCliente", label: "Código cliente" },
-  { key: "cliente", label: "Cliente" },
-  { key: "valorBruto", label: "Valor bruto" },
-  { key: "valorPago", label: "Valor pago" },
-  { key: "saldo", label: "Saldo da OS" },
-  { key: "vendedor", label: "Vendedor" },
-] as const;
-
-type ColunaOs = (typeof COLUNAS_OS)[number]["key"];
-type OrdemServico = Record<ColunaOs, string>;
-
-const COLUNAS_OS_STORAGE_KEY = "baranet:ficha:colunas-os";
-const TODAS_COLUNAS_OS: ColunaOs[] = COLUNAS_OS.map((c) => c.key);
-
-const ANO_ATUAL = new Date().getFullYear();
-const ANOS = Array.from({ length: 5 }, (_, i) => String(ANO_ATUAL - i));
-
-const formatBRL = (value: number) =>
-  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-function lerColunasSalvas(): ColunaOs[] | null {
-  try {
-    const raw = localStorage.getItem(COLUNAS_OS_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    return TODAS_COLUNAS_OS.filter((key) => parsed.includes(key));
-  } catch {
-    return null;
-  }
-}
-
-function OrdensServicoCliente({ cliente }: { cliente: Person }) {
-  const toast = useToast();
-  const [ano, setAno] = useState(String(ANO_ATUAL));
-  const [situacao, setSituacao] = useState<"pendentes" | "finalizadas">("pendentes");
-  // Só monta depois que o usuário seleciona um cliente, nunca no SSR — então
-  // ler o localStorage no inicializador não diverge do HTML do servidor.
-  const [colunasVisiveis, setColunasVisiveis] = useState<ColunaOs[]>(
-    () => lerColunasSalvas() ?? TODAS_COLUNAS_OS
-  );
-  const [seletorAberto, setSeletorAberto] = useState(false);
-
-  function toggleColuna(key: ColunaOs, visivel: boolean) {
-    setColunasVisiveis((prev) =>
-      visivel
-        ? TODAS_COLUNAS_OS.filter((k) => k === key || prev.includes(k))
-        : prev.filter((k) => k !== key)
-    );
-  }
-
-  function salvarColunas() {
-    try {
-      localStorage.setItem(COLUNAS_OS_STORAGE_KEY, JSON.stringify(colunasVisiveis));
-      toast.success("Colunas salvas.", "A seleção vale para este navegador.");
-    } catch {
-      toast.warning("Não foi possível salvar as colunas neste navegador.");
-    }
-  }
-
-  const columns: Column<OrdemServico>[] = COLUNAS_OS.filter((c) =>
-    colunasVisiveis.includes(c.key)
-  ).map((c) => ({ header: c.label, accessor: c.key }));
-
-  // A API ainda não expõe ordens de serviço por cliente: a tabela fica vazia
-  // até existir o endpoint (ano/situação já ficam prontos para virar filtro).
-  const ordens: OrdemServico[] = [];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="space-y-1.5">
-            <label htmlFor="os-ano" className="text-sm font-medium">Ano</label>
-            <Select value={ano} onValueChange={setAno}>
-              <SelectTrigger id="os-ano" className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ANOS.map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {a}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Tabs
-            defaultValue="pendentes"
-            value={situacao}
-            onValueChange={(v) => setSituacao(v as typeof situacao)}
-            className="w-auto"
-          >
-            <TabsList>
-              <TabsTrigger value="pendentes">Pendentes</TabsTrigger>
-              <TabsTrigger value="finalizadas">Finalizadas</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        <div className="relative flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSeletorAberto((open) => !open)}
-            aria-expanded={seletorAberto}
-          >
-            <Columns3 className="size-3.5" />
-            Selecionar colunas
-          </Button>
-          <Button size="sm" variant="ghost" onClick={salvarColunas} aria-label="Salvar colunas">
-            <Save className="size-3.5" />
-          </Button>
-          {seletorAberto && (
-            <div className="absolute right-0 top-full z-10 mt-1 w-56 space-y-2 rounded-lg border border-border bg-card p-3 shadow-md">
-              {COLUNAS_OS.map((c) => (
-                <label key={c.key} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={colunasVisiveis.includes(c.key)}
-                    onCheckedChange={(checked) => toggleColuna(c.key, checked === true)}
-                  />
-                  {c.label}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {columns.length > 0 ? (
-        <DataTable
-          data={ordens}
-          columns={columns}
-          keyExtractor={(row) => row.os}
-          emptyTitle={`Nenhuma OS ${situacao === "pendentes" ? "pendente" : "finalizada"} em ${ano}`}
-          emptyDescription={`A API ainda não expõe as ordens de serviço de ${cliente.name}.`}
-        />
-      ) : (
-        <EmptyState
-          title="Nenhuma coluna selecionada"
-          description="Use “Selecionar colunas” para escolher o que exibir."
-          className="rounded-lg border border-border py-12"
-        />
-      )}
-
-      <div className="flex flex-wrap items-center justify-end gap-4 text-sm">
-        <span className="font-medium">Total</span>
-        <span>Bruto {formatBRL(0)}</span>
-        <span>Pago {formatBRL(0)}</span>
-        <span>Saldo {formatBRL(0)}</span>
-        <Button
-          size="sm"
-          onClick={() =>
-            toast.info(
-              "Inclusão de OS ainda não disponível",
-              "A API ainda não expõe um endpoint de ordens de serviço."
-            )
-          }
-        >
-          <Plus className="size-3.5" />
-          Incluir OS
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function FichaCliente({ cliente }: { cliente: Person }) {
-  return (
-    <Tabs defaultValue="os">
-      <TabsList className="w-fit flex-wrap">
-        <TabsTrigger value="os">OS</TabsTrigger>
-        <TabsTrigger value="produtos">Produtos adquiridos</TabsTrigger>
-        <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
-        <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
-      </TabsList>
-      <TabsContent value="os">
-        <OrdensServicoCliente cliente={cliente} />
-      </TabsContent>
-      {(["produtos", "financeiro", "fiscal"] as const).map((value) => (
-        <TabsContent key={value} value={value}>
-          <EmptyState
-            title="Em construção"
-            description="Esta parte da ficha do cliente ainda não foi implementada."
-            className="rounded-lg border border-border py-12"
-          />
-        </TabsContent>
-      ))}
-    </Tabs>
-  );
 }
 
 export default function FichaCadastroPage() {
@@ -312,11 +107,7 @@ export default function FichaCadastroPage() {
       if (buscaId !== ultimaBuscaId.current) return;
       setResultados([]);
       setTotalPages(1);
-      setErroBusca(
-        err instanceof ApiRequestError
-          ? err.message
-          : "Verifique sua conexão e tente novamente."
-      );
+      setErroBusca(mensagemDeErro(err));
     } finally {
       if (buscaId === ultimaBuscaId.current) setLoading(false);
     }
@@ -578,6 +369,18 @@ export default function FichaCadastroPage() {
                 />
               ) : a.value === "cliente" ? (
                 <FichaCliente cliente={selecionado} />
+              ) : a.value === "fornecedor" ? (
+                selecionado.supplierId !== null ? (
+                  <FichaFornecedor key={selecionado.supplierId} supplierId={selecionado.supplierId} />
+                ) : (
+                  <EmptyState
+                    icon={AlertCircle}
+                    title="Cadastro de fornecedor não encontrado"
+                    description="A pessoa tem o papel fornecedor, mas a API não informou o código do fornecedor."
+                  />
+                )
+              ) : a.value === "financeiro" ? (
+                <AbaFinanceiro nome={selecionado.name} />
               ) : (
                 <EmptyState
                   title="Em construção"

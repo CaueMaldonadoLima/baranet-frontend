@@ -13,6 +13,7 @@
 
 import * as React from "react";
 import { X } from "lucide-react";
+import { PortalContainerContext } from "@/lib/portal-container";
 import { cn } from "@/lib/utils";
 
 interface ModalProps {
@@ -20,7 +21,7 @@ interface ModalProps {
   onOpenChange: (open: boolean) => void;
   title?: string;
   description?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "5xl";
   /** Impede fechar ao clicar fora. Default: false */
   persistent?: boolean;
   children: React.ReactNode;
@@ -31,6 +32,7 @@ const SIZE_CLASSES: Record<NonNullable<ModalProps["size"]>, string> = {
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-xl",
+  "5xl": "max-w-5xl",
 };
 
 export function Modal({
@@ -43,6 +45,12 @@ export function Modal({
   children,
 }: ModalProps) {
   const dialogRef = React.useRef<HTMLDialogElement>(null);
+  // O <dialog> vira container dos portais dos filhos (ver PortalContainerContext).
+  const [dialogEl, setDialogEl] = React.useState<HTMLDialogElement | null>(null);
+  const setDialogRef = React.useCallback((el: HTMLDialogElement | null) => {
+    dialogRef.current = el;
+    setDialogEl(el);
+  }, []);
 
   // Abre e fecha o <dialog> em sincronia com a prop `open`
   React.useEffect(() => {
@@ -73,6 +81,8 @@ export function Modal({
   // Fecha ao clicar no backdrop (clique fora do painel)
   const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
     if (persistent) return;
+    // Só o próprio <dialog> é backdrop — não o conteúdo portado para dentro dele.
+    if (e.target !== e.currentTarget) return;
     const rect = dialogRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clickedOutside =
@@ -85,7 +95,7 @@ export function Modal({
 
   return (
     <dialog
-      ref={dialogRef}
+      ref={setDialogRef}
       onClick={handleBackdropClick}
       className={cn(
         // reset do estilo nativo do <dialog>
@@ -136,7 +146,9 @@ export function Modal({
         )}
 
         {/* Body */}
-        <div className="px-6 py-5">{children}</div>
+        <PortalContainerContext.Provider value={dialogEl}>
+          <div className="px-6 py-5">{children}</div>
+        </PortalContainerContext.Provider>
       </div>
     </dialog>
   );
