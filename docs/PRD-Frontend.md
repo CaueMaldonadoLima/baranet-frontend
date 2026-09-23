@@ -241,7 +241,7 @@ Todos em `components/shared/` usando CVA + Radix quando aplicável.
 #### `modal`
 - Baseado em `@radix-ui/react-dialog` (adicionar)
 - Fechável por ESC e clique fora
-- Props: `open`, `onOpenChange`, `title`, `description`, `size` (sm|md|lg|xl)
+- Props: `open`, `onOpenChange`, `title`, `description`, `size` (sm|md|lg|xl|5xl — 5xl para tabelas largas)
 - Slots: header, body, footer
 
 #### `alert`

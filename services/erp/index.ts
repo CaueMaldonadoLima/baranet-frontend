@@ -5,3 +5,5 @@ export * from "./sales";
 export * from "./products";
 export * from "./stock";
 export * from "./orders";
+export * from "./brands";
+export * from "./representatives";

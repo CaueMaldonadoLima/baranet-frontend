@@ -482,8 +482,12 @@ Marcas do fornecedor: `GET/POST …/suppliers/{supplier}/brands` e
 | Marcas | `GET/POST brands` · `GET/PUT/PATCH/DELETE brands/{brand}` | MARCAS (telas 16–17) |
 | Representantes | `GET/POST representatives` | tela 18 |
 
-Funcionários, médicos e convênios são papéis sobre `people` e aceitam `personId`. Marcas e representantes não são papéis de `people`: o Swagger descreve representantes como "representantes comerciais de marca/fornecedor" e ainda não documenta o schema deles. O frontend
-ainda não tem proxy em `app/api/` para eles. Criar um proxy quando a tela correspondente for implementada.
+Funcionários, médicos e convênios são papéis sobre `people` e aceitam `personId`. Marcas e representantes não são papéis de `people`: o Swagger descreve representantes como "representantes comerciais de marca/fornecedor" e ainda não documenta o schema deles. Marcas
+(`app/api/brands`, `app/api/suppliers/[id]/brands`) e representantes (`app/api/representatives`)
+já têm proxy (telas 16–18). Em `/representatives`, só `name` é obrigatório no POST
+(conferido em 2026-09-23). O frontend envia `search` e lê `phone`/`email`, como no
+representante embutido em `Brand`: **pedir ao backend para documentar o schema, os filtros e os campos de
+segmento, estado, cidade e vigência** que a tela 18 exibe.
 
 ---
 

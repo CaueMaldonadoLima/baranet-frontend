@@ -196,6 +196,69 @@ export interface Person {
   doctorId: number | null;
   agreementId: number | null;
 }
+// Marca (fabricante) e seus Representantes comerciais — ver CONTEXT.md.
+// Não confundir com o Tipo de Cadastro "Representante".
+export interface BrandSegment {
+  id?: number;
+  name: string;
+  status: "ativo" | "inativo";
+}
+/** Representante de marca como vem embutido na Brand */
+export interface BrandRepresentative {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+}
+export interface Brand {
+  id: number;
+  name: string;
+  code: string | null;
+  origin: string | null;
+  logoUrl: string | null;
+  history: string | null;
+  active: boolean;
+  segments?: BrandSegment[];
+  representativeIds?: number[];
+  /** Representantes da marca */
+  representatives?: BrandRepresentative[];
+}
+/** Marca como vem em /suppliers/{id}/brands: com os campos do vínculo */
+export interface SupplierBrand extends Brand {
+  product: string | null;
+  validFrom: string | null;
+  validUntil: string | null;
+  /** Representante do vínculo — um dos representantes da marca */
+  representativeId: number | null;
+}
+export interface BrandWrite {
+  name: string;
+  code?: string;
+  origin?: string;
+  logoUrl?: string;
+  history?: string;
+  active?: boolean;
+  segments?: Omit<BrandSegment, "id">[];
+  representativeIds?: number[];
+}
+export interface SupplierBrandAttach {
+  brandId: number;
+  product?: string;
+  validFrom?: string;
+  validUntil?: string;
+  representativeId?: number;
+}
+/**
+ * GET /representatives — o Swagger ainda não documenta schema nem filtros.
+ * Só `name` é obrigatório no POST; phone/email seguem o representante
+ * embutido na Brand.
+ */
+export type Representative = BrandRepresentative;
+export interface RepresentativeWrite {
+  name: string;
+  phone?: string;
+  email?: string;
+}
 export interface Employee {
   id: number;
   name: string;
@@ -273,4 +336,11 @@ export class ApiRequestError extends Error {
     this.status = status;
     this.errors = errors;
   }
+}
+
+/** Mensagem para o usuário a partir de um erro de requisição */
+export function mensagemDeErro(err: unknown) {
+  return err instanceof ApiRequestError
+    ? err.message
+    : "Verifique sua conexão e tente novamente.";
 }
