@@ -40,7 +40,7 @@ export function AbaFiscal({ nome }: { nome: string }) {
           </Button>
         )}
       />
-      {nfeAberto && <PopupNfe open onOpenChange={setNfeAberto} origem="fiscal" />}
+      {nfeAberto && <PopupNfe open onOpenChange={setNfeAberto} />}
     </>
   );
 }

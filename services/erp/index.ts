@@ -7,3 +7,5 @@ export * from "./stock";
 export * from "./orders";
 export * from "./brands";
 export * from "./representatives";
+export * from "./stores";
+export * from "./employees";
