@@ -1,5 +1,5 @@
 import { api } from "../api";
-import type { Customer, CreateCustomerDTO, PaginatedResponse } from "../types";
+import type { Customer, CustomerDetail, CustomerWrite, PaginatedResponse } from "../types";
 
 export const customersService = {
   list: (params?: { page?: number; per_page?: number; search?: string }) => {
@@ -11,12 +11,11 @@ export const customersService = {
     return api.get<PaginatedResponse<Customer>>(`/customers${query ? `?${query}` : ""}`);
   },
 
-  get: (id: number) => api.get<Customer>(`/customers/${id}`),
+  get: (id: number) => api.get<CustomerDetail>(`/customers/${id}`),
 
-  create: (data: CreateCustomerDTO) => api.post<Customer>("/customers", data),
+  create: (data: CustomerWrite) => api.post<CustomerDetail>("/customers", data),
 
-  update: (id: number, data: Partial<CreateCustomerDTO>) =>
-    api.put<Customer>(`/customers/${id}`, data),
+  update: (id: number, data: CustomerWrite) => api.put<CustomerDetail>(`/customers/${id}`, data),
 
   delete: (id: number) => api.delete<void>(`/customers/${id}`),
 };

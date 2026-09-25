@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { use, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { AlertCircle, List, Plus, Search } from "lucide-react";
+import { AlertCircle, List, Plus, Search, Settings } from "lucide-react";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -25,7 +25,7 @@ import { AbaFinanceiro } from "./_components/popup-financeiro";
 const ABAS = [
   { value: "cliente", label: "Cliente", role: "customer", tipoCadastro: "cliente" },
   { value: "fornecedor", label: "Fornecedor", role: "supplier", tipoCadastro: "fornecedor" },
-  { value: "usuario", label: "Usuário", role: "employee", tipoCadastro: null },
+  { value: "usuario", label: "Usuário", role: "employee", tipoCadastro: "funcionario" },
   { value: "financeiro", label: "Financeiro", role: null, tipoCadastro: null },
   { value: "medico", label: "Médico / Optometrista", role: "doctor", tipoCadastro: null },
   { value: "convenio", label: "Convênio", role: "agreement", tipoCadastro: null },
@@ -38,6 +38,17 @@ const ABAS = [
 }[];
 
 type Aba = (typeof ABAS)[number]["value"];
+
+function ehAba(valor: string | undefined): valor is Aba {
+  return ABAS.some((a) => a.value === valor);
+}
+
+/** Formulário de cadastro do papel da aba, se a pessoa tiver esse papel */
+function linkEdicao(pessoa: Person, aba: Aba): string | null {
+  if (aba === "cliente" && pessoa.customerId !== null) return `/cadastro?tipo=cliente&id=${pessoa.customerId}`;
+  if (aba === "fornecedor" && pessoa.supplierId !== null) return `/cadastro?tipo=fornecedor&id=${pessoa.supplierId}`;
+  return null;
+}
 
 const PAPEL_LABEL: Record<PersonRole, string> = {
   customer: "Cliente",
@@ -61,10 +72,16 @@ interface Busca {
   termo: string;
 }
 
-export default function FichaCadastroPage() {
+// ?aba=<aba> abre a ficha naquela aba (o "Alterar" da tela Cadastro usa).
+export default function FichaCadastroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aba?: string }>;
+}) {
+  const { aba: abaInicial } = use(searchParams);
   const toast = useToast();
 
-  const [aba, setAba] = useState<Aba>("cliente");
+  const [aba, setAba] = useState<Aba>(ehAba(abaInicial) ? abaInicial : "cliente");
   const [campos, setCampos] = useState<Record<CampoBusca, string>>({
     name: "",
     document: "",
@@ -147,6 +164,20 @@ export default function FichaCadastroPage() {
   }
 
   const colunasResultado: Column<Person>[] = [
+    {
+      header: "",
+      className: "w-12",
+      cell: (row) => {
+        const edicao = linkEdicao(row, aba);
+        return edicao ? (
+          <Button size="xs" variant="ghost" asChild>
+            <Link href={edicao} aria-label={`Editar cadastro de ${row.name}`} title="Editar cadastro">
+              <Settings className="size-3.5" />
+            </Link>
+          </Button>
+        ) : null;
+      },
+    },
     { header: "Código", accessor: "code", className: "w-24" },
     {
       header: "Nome",
@@ -183,6 +214,7 @@ export default function FichaCadastroPage() {
   ];
 
   const campoBuscado = busca && CAMPOS_BUSCA.find((c) => c.key === busca.campo)!;
+  const edicaoSelecionado = selecionado && linkEdicao(selecionado, aba);
 
   return (
     <div className="px-[4.2vw] py-8 space-y-6">
@@ -305,6 +337,14 @@ export default function FichaCadastroPage() {
             <label htmlFor="selecionado-documento" className="text-sm font-medium">CPF / CNPJ</label>
             <Input id="selecionado-documento" value={selecionado?.document ?? ""} readOnly placeholder="—" />
           </div>
+          {edicaoSelecionado && (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={edicaoSelecionado}>
+                <Settings className="size-3.5" />
+                Editar cadastro
+              </Link>
+            </Button>
+          )}
         </div>
 
         {busca !== null && campoBuscado && mostrarResultados && (

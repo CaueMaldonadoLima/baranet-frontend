@@ -1,5 +1,5 @@
 import { api } from "../api";
-import type { Supplier, CreateSupplierDTO, PaginatedResponse } from "../types";
+import type { Supplier, SupplierWrite, PaginatedResponse } from "../types";
 
 export const suppliersService = {
   list: (params?: { page?: number; per_page?: number; search?: string; category?: string }) => {
@@ -14,10 +14,9 @@ export const suppliersService = {
 
   get: (id: number) => api.get<Supplier>(`/suppliers/${id}`),
 
-  create: (data: CreateSupplierDTO) => api.post<Supplier>("/suppliers", data),
+  create: (data: SupplierWrite) => api.post<Supplier>("/suppliers", data),
 
-  update: (id: number, data: Partial<CreateSupplierDTO>) =>
-    api.put<Supplier>(`/suppliers/${id}`, data),
+  update: (id: number, data: SupplierWrite) => api.put<Supplier>(`/suppliers/${id}`, data),
 
   delete: (id: number) => api.delete<void>(`/suppliers/${id}`),
 };

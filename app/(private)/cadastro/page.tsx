@@ -1,17 +1,16 @@
 "use client";
 
-import { use, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { Camera, Clock, Eye, EyeOff, List, Plus, QrCode, Search, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { Badge } from "@/components/shared/badge";
+import { EmptyState } from "@/components/shared/empty-state";
 import { FormSection } from "@/components/shared/form-section";
+import { Skeleton } from "@/components/shared/skeleton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -22,1821 +21,354 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/shared/toast";
 import { customersService, suppliersService } from "@/services/erp";
-import { ApiRequestError } from "@/services/types";
+import { ApiRequestError, mensagemDeErro } from "@/services/types";
+import { Campo } from "./_components/campo";
+import { ClienteCompleto, ClienteRapido } from "./_components/cliente-campos";
+import { EnderecoCampos } from "./_components/endereco-campos";
+import { FornecedorCompleto } from "./_components/fornecedor-completo";
+import { FuncionarioSecoes } from "./_components/funcionario-secoes";
+import { PessoaRapido } from "./_components/pessoa-rapido";
+import {
+  clienteParaForm,
+  clienteVazio,
+  formParaClienteWrite,
+  validarCliente,
+  type ClienteForm,
+} from "./_lib/cliente-form";
+import {
+  fornecedorParaForm,
+  fornecedorVazio,
+  formParaFornecedorWrite,
+  validarFornecedor,
+  type FornecedorForm,
+} from "./_lib/fornecedor-form";
 
-const WEEK_DAYS = ["Todos", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
+const TIPOS_CADASTRO = [
+  { value: "cliente", label: "Cliente" },
+  { value: "fornecedor", label: "Fornecedor" },
+  { value: "funcionario", label: "Funcionário" },
+  { value: "representante", label: "Representante" },
+] as const;
 
-const TIME_FIELDS = [
-  "Hora de entrada",
-  "Hora de saída",
-  "Almoço intervalo/início",
-  "Almoço intervalo/término",
-  "Intervalo início",
-  "Intervalo término",
-];
+type TipoCadastro = (typeof TIPOS_CADASTRO)[number]["value"];
 
-const DIA_LETRAS = ["S", "T", "Q", "Q", "S", "S", "D"];
+/** Aba da ficha que lista cada tipo (o "Alterar" abre a busca nela) */
+const ABA_DA_FICHA: Record<TipoCadastro, string | null> = {
+  cliente: "cliente",
+  fornecedor: "fornecedor",
+  funcionario: "usuario",
+  representante: null,
+};
 
-function DiasTrabalho({
-  selected,
-  onToggle,
-}: {
-  selected: boolean[];
-  onToggle: (index: number) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-muted-foreground">Dias de trabalho</p>
-      <div className="flex gap-2">
-        {DIA_LETRAS.map((letra, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onToggle(i)}
-            className={cn(
-              "flex size-8 items-center justify-center rounded-full border text-xs font-semibold transition-colors",
-              selected[i]
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-input text-muted-foreground hover:bg-muted"
-            )}
-          >
-            {letra}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+function ehTipo(valor: string | undefined): valor is TipoCadastro {
+  return TIPOS_CADASTRO.some((t) => t.value === valor);
 }
 
-const UFS = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
-  "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
-];
+type Carregamento = { status: "ok" } | { status: "carregando" } | { status: "erro"; mensagem: string };
 
-const CLIENTE_INICIAL = {
-  tipoCliente: "otimo",
-  menorSemCpf: false,
-  rg: "",
-  nascimento: "",
-  sexo: "",
-  estadoCivil: "",
-  natural: "",
-  dddComercial: "",
-  telefoneComercial: "",
-  ramal: "",
-  estrangeiro: false,
-  documentoEstrangeiro: "",
-  emissaoRg: "",
-  orgaoEmissorRg: "",
-  ufRg: "",
-  apelido: "",
-  pais: "Brasil",
-};
-
-const ENDERECO_INICIAL = {
-  cep: "",
-  uf: "",
-  tipo: "comercial",
-  bairro: "",
-  pais: "Brasil",
-  cidade: "",
-  logradouro: "",
-  numero: "",
-  complemento: "",
-};
-
-const FILA_OPCOES = [
-  "Iniciado um atendimento, fica o nome do usuário vendedor fixo na venda iniciada, só podendo ser trocado mediante autorização",
-  "Definir a fila de atendimento pelo primeiro a se logar",
-  "Definir posição pelo horário cadastrado de entrada do usuário",
-  "Usuário vendedor, se em atendimento e iniciado o seu horário de venda, logo que encerrar atendimento pega o primeiro horário de almoço disponível na fila",
-  "Usa parâmetros de horário no dashboard fila de atendimento",
-  "Se estiver em atendimento, passar o próximo da fila de atendimento que não estiver atendendo para horário de almoço",
-  "Usuário vendedor: saída do intervalo retorna na mesma posição da fila",
-  "Usuário vendedor: saída do intervalo retorna na última posição da fila",
-  "Posição na fila definida pelo primeiro a se logar",
-];
-
-const TIPOS_CADASTRO = ["cliente", "fornecedor", "representante"];
-
+// /cadastro?tipo=<tipo> abre um cadastro novo naquele tipo; com &id=<id>
+// (cliente ou fornecedor) carrega o registro existente para alterar. A ficha
+// (/cadastro/ficha) abre esta tela nos dois modos.
 export default function CadastroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tipo?: string }>;
+  searchParams: Promise<{ tipo?: string; id?: string }>;
 }) {
-  // A ficha de busca (/cadastro/ficha) abre esta tela já no tipo da aba ativa.
-  const { tipo } = use(searchParams);
-  const toast = useToast();
+  const { tipo, id } = use(searchParams);
+  const tipoInicial: TipoCadastro = ehTipo(tipo) ? tipo : "cliente";
+  const idNum =
+    id && /^\d+$/.test(id) && (tipoInicial === "cliente" || tipoInicial === "fornecedor")
+      ? Number(id)
+      : null;
+  // "Incluir" num cadastro novo não muda a URL: este contador remonta o formulário.
+  const [novo, setNovo] = useState(0);
 
-  const [nomeFantasia, setNomeFantasia] = useState("");
-  const [razaoSocial, setRazaoSocial] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [pessoa, setPessoa] = useState("juridica");
-  const [ddd, setDdd] = useState("");
-  const [status, setStatus] = useState("ativo");
-
-  const [inscricaoEstadual, setInscricaoEstadual] = useState("");
-  const [cfopEntradaEstoque, setCfopEntradaEstoque] = useState("");
-  const [regimeTributario, setRegimeTributario] = useState("simples");
-  const [nossoCodigoCompras, setNossoCodigoCompras] = useState("");
-  const [site, setSite] = useState("");
-
-  const [endereco, setEndereco] = useState(ENDERECO_INICIAL);
-
-  const [cliente, setCliente] = useState(CLIENTE_INICIAL);
-  const [fotoCliente, setFotoCliente] = useState<string | null>(null);
-  const [qrCodeCliente, setQrCodeCliente] = useState<string | null>(null);
-  const fotoInputRef = useRef<HTMLInputElement>(null);
-  const qrCodeInputRef = useRef<HTMLInputElement>(null);
-
-  // Libera os object URLs das imagens quando são trocadas ou removidas.
-  useEffect(() => () => { if (fotoCliente) URL.revokeObjectURL(fotoCliente); }, [fotoCliente]);
-  useEffect(() => () => { if (qrCodeCliente) URL.revokeObjectURL(qrCodeCliente); }, [qrCodeCliente]);
-
-  function updateCliente<K extends keyof typeof CLIENTE_INICIAL>(
-    key: K,
-    value: (typeof CLIENTE_INICIAL)[K]
-  ) {
-    setCliente((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function handleImagemSelecionada(
-    e: ChangeEvent<HTMLInputElement>,
-    setter: (url: string | null) => void
-  ) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.warning("Selecione um arquivo de imagem.");
-      return;
-    }
-    setter(URL.createObjectURL(file));
-  }
-
-  const [tipoRastreioEntrega, setTipoRastreioEntrega] = useState("numero_pedido");
-  const [numeroPedidoEntrega, setNumeroPedidoEntrega] = useState("");
-  const [motoristaEntrega, setMotoristaEntrega] = useState("");
-  const [solicitadoPorEntrega, setSolicitadoPorEntrega] = useState("");
-
-  function handleEnderecoChange(e: ChangeEvent<HTMLInputElement>) {
-    setEndereco((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  }
-
-  const [tipoCadastro, setTipoCadastro] = useState(
-    tipo && TIPOS_CADASTRO.includes(tipo) ? tipo : "cliente"
+  return (
+    <FormularioCadastro
+      key={`${tipoInicial}:${idNum ?? "novo"}:${novo}`}
+      tipoInicial={tipoInicial}
+      id={idNum}
+      onNovo={() => setNovo((n) => n + 1)}
+    />
   );
+}
+
+function FormularioCadastro({
+  tipoInicial,
+  id,
+  onNovo,
+}: {
+  tipoInicial: TipoCadastro;
+  id: number | null;
+  onNovo: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const editando = id !== null;
+
+  const [tipoCadastro, setTipoCadastro] = useState<TipoCadastro>(tipoInicial);
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
-  const [senhaManual, setSenhaManual] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [trocarProximoAcesso, setTrocarProximoAcesso] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [cliente, setCliente] = useState<ClienteForm>(clienteVazio);
+  // Fornecedor, funcionário e representante compartilham o cadastro rápido.
+  const [pessoa, setPessoa] = useState<FornecedorForm>(fornecedorVazio);
+  const [carregamento, setCarregamento] = useState<Carregamento>(
+    editando ? { status: "carregando" } : { status: "ok" }
+  );
+  const [tentativa, setTentativa] = useState(0);
+  const [salvando, setSalvando] = useState(false);
 
-  const [funcTab, setFuncTab] = useState<"usuario" | "direitos">("usuario");
-  const [horarioModo, setHorarioModo] = useState("controla");
-  const [horarioDia, setHorarioDia] = useState("todos");
-  const [usuarioVendedor, setUsuarioVendedor] = useState(false);
-  const [filaOpcao, setFilaOpcao] = useState(FILA_OPCOES[0]);
-  const [ipsLivre, setIpsLivre] = useState(true);
-  const [usuarioFuncionario, setUsuarioFuncionario] = useState(false);
-  const [insalubridade, setInsalubridade] = useState(false);
-  const [insalubridadeNivel, setInsalubridadeNivel] = useState("baixa");
-  const [periculosidade, setPericulosidade] = useState(false);
+  useEffect(() => {
+    if (id === null) return;
+    let ativo = true;
+    const carregar =
+      tipoInicial === "fornecedor"
+        ? suppliersService.get(id).then((s) => {
+            if (ativo) setPessoa(fornecedorParaForm(s));
+          })
+        : customersService.get(id).then((c) => {
+            if (ativo) setCliente(clienteParaForm(c));
+          });
+    carregar
+      .then(() => {
+        if (ativo) setCarregamento({ status: "ok" });
+      })
+      .catch((err) => {
+        if (ativo) setCarregamento({ status: "erro", mensagem: mensagemDeErro(err) });
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [id, tipoInicial, tentativa]);
 
-  const [valeTransporte, setValeTransporte] = useState(false);
-  const [valeTransporteDias, setValeTransporteDias] = useState(Array(7).fill(true));
-  const [valeAlimentacao, setValeAlimentacao] = useState(false);
-  const [valeAlimentacaoDias, setValeAlimentacaoDias] = useState(Array(7).fill(true));
-  const [cestaBasica, setCestaBasica] = useState(false);
-  const [cestaBasicaDias, setCestaBasicaDias] = useState(Array(7).fill(true));
-  const [planoSaude, setPlanoSaude] = useState(false);
+  const atualizarCliente = (patch: Partial<ClienteForm>) => setCliente((prev) => ({ ...prev, ...patch }));
+  const atualizarPessoa = (patch: Partial<FornecedorForm>) => setPessoa((prev) => ({ ...prev, ...patch }));
 
-  function toggleDia(setter: (fn: (prev: boolean[]) => boolean[]) => void, index: number) {
-    setter((prev) => prev.map((v, i) => (i === index ? !v : v)));
+  const rotuloTipo = TIPOS_CADASTRO.find((t) => t.value === tipoCadastro)!.label;
+
+  function handleIncluir() {
+    toast.info(`Novo cadastro de ${rotuloTipo.toLowerCase()} iniciado.`);
+    if (editando) router.push(`/cadastro?tipo=${tipoCadastro}`);
+    else onNovo();
   }
 
   async function handleSave() {
-    // Razão social fica oculta no cadastro de cliente: não usar um valor
-    // digitado antes de trocar o tipo de cadastro.
-    const name =
-      tipoCadastro === "cliente"
-        ? nomeFantasia.trim()
-        : nomeFantasia.trim() || razaoSocial.trim();
-    if (!name) {
-      toast.warning("Informe ao menos o nome fantasia ou a razão social.");
-      return;
-    }
-
-    if (tipoCadastro === "representante") {
+    if (tipoCadastro === "funcionario" || tipoCadastro === "representante") {
       toast.info(
-        "Cadastro de representante ainda não disponível",
-        "A API ainda não expõe um endpoint com campos para representantes."
+        `Cadastro de ${tipoCadastro === "funcionario" ? "funcionário" : "representante"} ainda não disponível`,
+        "Este tipo de cadastro ainda não é gravado na API."
       );
       return;
     }
 
-    const document = cnpj.replace(/\D/g, "") || undefined;
-    const phone = telefone.trim() || undefined;
+    const erro = tipoCadastro === "fornecedor" ? validarFornecedor(pessoa) : validarCliente(cliente);
+    if (erro) {
+      toast.warning(erro);
+      return;
+    }
 
-    setLoading(true);
+    setSalvando(true);
     try {
+      let salvoId: number;
       if (tipoCadastro === "fornecedor") {
-        await suppliersService.create({ name, cnpj: document, phone });
-        toast.success("Fornecedor cadastrado com sucesso.");
+        const payload = formParaFornecedorWrite(pessoa, editando ? "editar" : "criar");
+        salvoId = (editando ? await suppliersService.update(id, payload) : await suppliersService.create(payload)).id;
       } else {
-        // Os demais campos da tela 02/18 (RG, nascimento, foto etc.) ainda não
-        // existem no contrato de POST /erp/customers (docs/backend-contract.md).
-        await customersService.create({
-          name,
-          cpf: cliente.menorSemCpf ? undefined : document,
-          phone,
-          city: endereco.cidade.trim() || undefined,
-          state: endereco.uf.trim().toUpperCase() || undefined,
-        });
-        toast.success(
-          "Cliente cadastrado com sucesso.",
-          "Foto, QR Code e dados do cadastro completo ainda não são enviados à API."
-        );
+        const payload = formParaClienteWrite(cliente, editando ? "editar" : "criar");
+        salvoId = (editando ? await customersService.update(id, payload) : await customersService.create(payload)).id;
       }
+      const rotulo = tipoCadastro === "fornecedor" ? "Fornecedor" : "Cliente";
+      toast.success(editando ? `${rotulo} atualizado.` : `${rotulo} cadastrado com sucesso.`);
+      // Depois de criar, a tela passa a editar o registro: um novo Gravar atualiza, não duplica.
+      if (!editando) router.replace(`/cadastro?tipo=${tipoCadastro}&id=${salvoId}`);
     } catch (err) {
       if (err instanceof ApiRequestError) {
-        const firstFieldError = err.errors && Object.values(err.errors)[0]?.[0];
-        toast.error(err.message, firstFieldError);
+        const primeiroErroDeCampo = err.errors && Object.values(err.errors)[0]?.[0];
+        toast.error(err.message, primeiroErroDeCampo);
       } else {
         toast.error("Não foi possível salvar o cadastro.", "Verifique sua conexão e tente novamente.");
       }
     } finally {
-      setLoading(false);
+      setSalvando(false);
     }
   }
 
-  function handleIncluir() {
-    setNomeFantasia("");
-    setRazaoSocial("");
-    setCnpj("");
-    setTelefone("");
-    setPessoa("juridica");
-    setDdd("");
-    setStatus("ativo");
-    setInscricaoEstadual("");
-    setCfopEntradaEstoque("");
-    setRegimeTributario("simples");
-    setNossoCodigoCompras("");
-    setSite("");
-    setEndereco(ENDERECO_INICIAL);
-    setTipoRastreioEntrega("numero_pedido");
-    setNumeroPedidoEntrega("");
-    setMotoristaEntrega("");
-    setSolicitadoPorEntrega("");
-    setCliente(CLIENTE_INICIAL);
-    setFotoCliente(null);
-    setQrCodeCliente(null);
-    toast.info(`Novo cadastro de ${tipoCadastro === "fornecedor" ? "fornecedor" : "cliente"} iniciado.`);
-  }
+  const abaDaFicha = ABA_DA_FICHA[tipoCadastro];
 
-  function handleAlterar() {
-    toast.info(
-      "Alteração de cadastro ainda não disponível",
-      `Carregar um ${tipoCadastro === "fornecedor" ? "fornecedor" : "cliente"} existente neste formulário ainda não foi implementado. Use a Busca para localizá-lo.`
-    );
-  }
+  const seletorTipo = (
+    <Campo id="cadastrar-como" label="Cadastrar como">
+      <Select value={tipoCadastro} onValueChange={(v) => setTipoCadastro(v as TipoCadastro)} disabled={editando}>
+        <SelectTrigger id="cadastrar-como" className="w-full">
+          <SelectValue placeholder="Selecione" />
+        </SelectTrigger>
+        <SelectContent>
+          {TIPOS_CADASTRO.map((t) => (
+            <SelectItem key={t.value} value={t.value}>
+              {t.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Campo>
+  );
+
+  const botoes = (
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" onClick={handleIncluir}>
+        Incluir
+      </Button>
+      {abaDaFicha ? (
+        <Button size="sm" variant="secondary" asChild>
+          <Link href={`/cadastro/ficha?aba=${abaDaFicha}`}>Alterar</Link>
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => toast.info("Alteração de representante ainda não disponível", "A API ainda não tem este tipo de cadastro.")}
+        >
+          Alterar
+        </Button>
+      )}
+      <Button size="sm" onClick={handleSave} disabled={salvando || carregamento.status !== "ok"}>
+        {salvando ? "Gravando..." : "Gravar"}
+      </Button>
+      <Button size="sm" variant="outline" asChild>
+        <Link href="/">Cancelar</Link>
+      </Button>
+    </div>
+  );
 
   return (
     <div className="px-[4.2vw] py-8 space-y-6">
-      <Breadcrumb
-        items={[
-          { label: "ERP", href: "/" },
-          { label: "Cadastro" },
-        ]}
-      />
+      <Breadcrumb items={[{ label: "ERP", href: "/" }, { label: "Cadastro" }]} />
 
-      <h1 className="text-2xl font-bold tracking-tight">Cadastro</h1>
-
-      <div className="w-full space-y-8">
-        {(tipoCadastro === "fornecedor" || tipoCadastro === "cliente") && (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={handleIncluir}>
-              Incluir
-            </Button>
-            <Button size="sm" variant="secondary" onClick={handleAlterar}>
-              Alterar
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={loading}>
-              {loading ? "Gravando..." : "Gravar"}
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <Link href="/">Cancelar</Link>
-            </Button>
-          </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Cadastro</h1>
+        {editando && (
+          <Badge variant="muted">
+            Alterando {rotuloTipo.toLowerCase()} nº {id}
+          </Badge>
         )}
+      </div>
 
-        <Card className="px-6">
-        <FormSection
-          title="Cadastro rápido"
-          description="Dados básicos de identificação do usuário."
-        >
-          {tipoCadastro === "cliente" ? (
-          <div className="flex flex-col gap-6 md:flex-row">
-            <div className="flex w-full shrink-0 flex-col gap-2 md:w-44">
-              <p className="text-sm font-medium">Dados cadastrais</p>
-              <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border border-input bg-muted/30">
-                {fotoCliente ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- preview local via object URL
-                  <img src={fotoCliente} alt="Foto do cliente" className="size-full object-cover" />
-                ) : (
-                  <span className="text-xs text-muted-foreground">Sem dados</span>
-                )}
-              </div>
-              <input
-                ref={fotoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleImagemSelecionada(e, setFotoCliente)}
-              />
-              <input
-                ref={qrCodeInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleImagemSelecionada(e, setQrCodeCliente)}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" onClick={() => fotoInputRef.current?.click()}>
-                  <Camera className="size-3.5" />
-                  Foto
-                </Button>
-                <Button size="sm" asChild>
-                  <Link href="/cadastro/ficha">
-                    <Search className="size-3.5" />
-                    Busca
-                  </Link>
-                </Button>
-              </div>
-              <Button size="sm" onClick={() => qrCodeInputRef.current?.click()}>
-                <QrCode className="size-3.5" />
-                Imagem QR Code
-              </Button>
-              {qrCodeCliente && (
-                <div className="flex items-center gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- preview local via object URL */}
-                  <img
-                    src={qrCodeCliente}
-                    alt="QR Code do cliente"
-                    className="size-14 rounded border border-input object-contain"
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setQrCodeCliente(null)}
-                    aria-label="Remover QR Code"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
+      {carregamento.status === "erro" ? (
+        <EmptyState
+          icon={AlertCircle}
+          title={`Não foi possível carregar o ${rotuloTipo.toLowerCase()}`}
+          description={carregamento.mensagem}
+          action={{
+            label: "Tentar novamente",
+            onClick: () => {
+              setCarregamento({ status: "carregando" });
+              setTentativa((t) => t + 1);
+            },
+          }}
+          className="rounded-lg border border-border py-12"
+        />
+      ) : carregamento.status === "carregando" ? (
+        <div className="space-y-4" aria-busy="true">
+          <Skeleton className="h-9 w-80" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : (
+        <div className="w-full space-y-8">
+          {botoes}
+
+          <Card className="px-6">
+            <FormSection title="Cadastro rápido" description="Dados básicos de identificação.">
+              {tipoCadastro === "cliente" ? (
+                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={id} seletorTipo={seletorTipo} />
+              ) : (
+                <PessoaRapido
+                  form={pessoa}
+                  atualizar={atualizarPessoa}
+                  codigo={id}
+                  camposFiscais={tipoCadastro === "fornecedor"}
+                  seletorTipo={seletorTipo}
+                />
               )}
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!fotoCliente}
-                onClick={() => setFotoCliente(null)}
-              >
-                Excluir foto do cliente
-              </Button>
-            </div>
-
-            <div className="grid flex-1 content-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-1.5 lg:col-span-2">
-                <label className="text-sm font-medium">Código</label>
-                <Input placeholder="Gerado automaticamente" disabled />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">CPF / CNPJ</label>
-                <Input
-                  placeholder={cliente.menorSemCpf ? "Cliente menor sem CPF" : "000.000.000-00"}
-                  value={cliente.menorSemCpf ? "" : cnpj}
-                  onChange={(e) => setCnpj(e.target.value)}
-                  disabled={cliente.menorSemCpf}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Whatsapp</label>
-                <Input
-                  placeholder="(00) 00000-0000"
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
-                <label className="text-sm font-medium">Nome fantasia / Razão social</label>
-                <Input
-                  placeholder="Nome completo ou razão social do cliente"
-                  value={nomeFantasia}
-                  onChange={(e) => setNomeFantasia(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Tipo de cliente</label>
-                <Select
-                  value={cliente.tipoCliente}
-                  onValueChange={(value) => updateCliente("tipoCliente", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="otimo">Ótimo</SelectItem>
-                    <SelectItem value="bom">Bom</SelectItem>
-                    <SelectItem value="regular">Regular</SelectItem>
-                    <SelectItem value="ruim">Ruim</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Status</label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ativo">Ativo</SelectItem>
-                    <SelectItem value="inativo">Inativo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Cadastrar como</label>
-                <Select value={tipoCadastro} onValueChange={setTipoCadastro}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cliente">Cliente</SelectItem>
-                    <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                    <SelectItem value="representante">Representante</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <label className="flex cursor-pointer items-center gap-2.5 self-end pb-2">
-                <Checkbox
-                  checked={cliente.menorSemCpf}
-                  onCheckedChange={(checked) => updateCliente("menorSemCpf", checked === true)}
-                />
-                <span className="text-sm text-foreground">Cliente menor sem CPF</span>
-              </label>
-            </div>
-          </div>
-          ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Código</label>
-              <Input placeholder="Gerado automaticamente" disabled />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Pessoa</label>
-              <Select value={pessoa} onValueChange={setPessoa}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fisica">Física</SelectItem>
-                  <SelectItem value="juridica">Jurídica</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">CNPJ</label>
-              <Input
-                placeholder="00.000.000/0001-00"
-                value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">DDD</label>
-              <Input
-                placeholder="11"
-                maxLength={2}
-                value={ddd}
-                onChange={(e) => setDdd(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Telefone / Whatsapp</label>
-              <Input
-                placeholder="(00) 00000-0000"
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Status</label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ativo">Ativo</SelectItem>
-                  <SelectItem value="inativo">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3 xl:col-span-6 space-y-1.5">
-              <label className="text-sm font-medium">Nome fantasia</label>
-              <Input
-                placeholder="Nome de exibição do usuário"
-                value={nomeFantasia}
-                onChange={(e) => setNomeFantasia(e.target.value)}
-              />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-5 space-y-1.5">
-              <label className="text-sm font-medium">Razão social</label>
-              <Input
-                placeholder="Razão social completa"
-                value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Cadastrar como</label>
-              <Select value={tipoCadastro} onValueChange={setTipoCadastro}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">Cliente</SelectItem>
-                  <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                  <SelectItem value="representante">Representante</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {tipoCadastro === "fornecedor" && (
-              <>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Inscrição Estadual</label>
-                  <Input
-                    placeholder="Inscrição Estadual"
-                    value={inscricaoEstadual}
-                    onChange={(e) => setInscricaoEstadual(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    CFOP Default na entrada de estoque
-                  </label>
-                  <Input
-                    placeholder="Ex: 1102"
-                    value={cfopEntradaEstoque}
-                    onChange={(e) => setCfopEntradaEstoque(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Regime Tributário</label>
-                  <Select value={regimeTributario} onValueChange={setRegimeTributario}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="simples">Simples Nacional</SelectItem>
-                      <SelectItem value="presumido">Lucro Presumido</SelectItem>
-                      <SelectItem value="real">Lucro Real</SelectItem>
-                      <SelectItem value="mei">MEI</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Nosso código de compras</label>
-                  <Input
-                    placeholder="Código utilizado junto a este fornecedor"
-                    value={nossoCodigoCompras}
-                    onChange={(e) => setNossoCodigoCompras(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Site</label>
-                  <Input
-                    type="url"
-                    placeholder="https://"
-                    value={site}
-                    onChange={(e) => setSite(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-          )}
-        </FormSection>
-        </Card>
-
-        {tipoCadastro === "cliente" && (
-          <Card className="px-6">
-            <FormSection
-              title="Cadastro completo"
-              description="Documentos e dados pessoais do cliente."
-            >
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">RG</label>
-                  <Input
-                    placeholder="RG"
-                    value={cliente.rg}
-                    onChange={(e) => updateCliente("rg", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Nascimento</label>
-                  <Input
-                    type="date"
-                    value={cliente.nascimento}
-                    onChange={(e) => updateCliente("nascimento", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Sexo</label>
-                  <Select value={cliente.sexo} onValueChange={(value) => updateCliente("sexo", value)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="feminino">Feminino</SelectItem>
-                      <SelectItem value="masculino">Masculino</SelectItem>
-                      <SelectItem value="nao_informado">Prefere não informar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-4 border-t border-border pt-6">
-                <p className="text-sm font-medium">Dados adicionais</p>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Estado civil</label>
-                    <Select
-                      value={cliente.estadoCivil}
-                      onValueChange={(value) => updateCliente("estadoCivil", value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="solteiro">Solteiro(a)</SelectItem>
-                        <SelectItem value="casado">Casado(a)</SelectItem>
-                        <SelectItem value="uniao_estavel">União estável</SelectItem>
-                        <SelectItem value="divorciado">Divorciado(a)</SelectItem>
-                        <SelectItem value="viuvo">Viúvo(a)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Natural</label>
-                    <Input
-                      placeholder="Cidade de nascimento"
-                      value={cliente.natural}
-                      onChange={(e) => updateCliente("natural", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">DDD</label>
-                    <Input
-                      placeholder="11"
-                      maxLength={2}
-                      value={cliente.dddComercial}
-                      onChange={(e) => updateCliente("dddComercial", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Telefone comercial</label>
-                    <Input
-                      placeholder="0000-0000"
-                      value={cliente.telefoneComercial}
-                      onChange={(e) => updateCliente("telefoneComercial", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Ramal</label>
-                    <Input
-                      placeholder="Ramal"
-                      value={cliente.ramal}
-                      onChange={(e) => updateCliente("ramal", e.target.value)}
-                    />
-                  </div>
-
-                  <label className="flex cursor-pointer items-center gap-2.5 sm:col-span-2 lg:col-span-5">
-                    <Checkbox
-                      checked={cliente.estrangeiro}
-                      onCheckedChange={(checked) => updateCliente("estrangeiro", checked === true)}
-                    />
-                    <span className="text-sm text-foreground">Cliente estrangeiro</span>
-                  </label>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Estrangeiro</label>
-                    <Input
-                      placeholder="Passaporte / RNE"
-                      value={cliente.documentoEstrangeiro}
-                      onChange={(e) => updateCliente("documentoEstrangeiro", e.target.value)}
-                      disabled={!cliente.estrangeiro}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Emissão RG</label>
-                    <Input
-                      type="date"
-                      value={cliente.emissaoRg}
-                      onChange={(e) => updateCliente("emissaoRg", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Órgão emissor RG</label>
-                    <Input
-                      placeholder="SSP"
-                      value={cliente.orgaoEmissorRg}
-                      onChange={(e) => updateCliente("orgaoEmissorRg", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">UF</label>
-                    <Select value={cliente.ufRg} onValueChange={(value) => updateCliente("ufRg", value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="UF" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UFS.map((uf) => (
-                          <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Última compra</label>
-                    <Input type="date" disabled title="Preenchido automaticamente pelo sistema" />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Data de cadastro</label>
-                    <Input type="date" disabled title="Preenchido automaticamente pelo sistema" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Atualização</label>
-                    <Input type="date" disabled title="Preenchido automaticamente pelo sistema" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Apelido</label>
-                    <Input
-                      placeholder="Como o cliente prefere ser chamado"
-                      value={cliente.apelido}
-                      onChange={(e) => updateCliente("apelido", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">País</label>
-                    <Input
-                      placeholder="Brasil"
-                      value={cliente.pais}
-                      onChange={(e) => updateCliente("pais", e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
             </FormSection>
           </Card>
-        )}
 
-        {(tipoCadastro === "fornecedor" || tipoCadastro === "cliente") && (
-          <Card className="px-6">
-            <FormSection
-              title="Endereço"
-              description={
-                tipoCadastro === "fornecedor"
-                  ? "Endereço comercial do fornecedor."
-                  : "Endereço do cliente. Cidade e UF são enviadas no cadastro."
-              }
-            >
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">CEP</label>
-                  <Input
-                    name="cep"
-                    placeholder="00000-000"
-                    maxLength={9}
-                    value={endereco.cep}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">UF</label>
-                  <Input
-                    name="uf"
-                    placeholder="SP"
-                    maxLength={2}
-                    value={endereco.uf}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Tipo</label>
-                  <Select
-                    value={endereco.tipo}
-                    onValueChange={(value) =>
-                      setEndereco((prev) => ({ ...prev, tipo: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="comercial">Comercial</SelectItem>
-                      <SelectItem value="cobranca">Cobrança</SelectItem>
-                      <SelectItem value="entrega">Entrega</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Bairro</label>
-                  <Input
-                    name="bairro"
-                    placeholder="Bairro"
-                    value={endereco.bairro}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">País</label>
-                  <Input
-                    name="pais"
-                    placeholder="Brasil"
-                    value={endereco.pais}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Cidade</label>
-                  <Input
-                    name="cidade"
-                    placeholder="Cidade"
-                    value={endereco.cidade}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Logradouro</label>
-                  <Input
-                    name="logradouro"
-                    placeholder="Rua, avenida..."
-                    value={endereco.logradouro}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Número</label>
-                  <Input
-                    name="numero"
-                    placeholder="Número"
-                    value={endereco.numero}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Complemento</label>
-                  <Input
-                    name="complemento"
-                    placeholder="Complemento"
-                    value={endereco.complemento}
-                    onChange={handleEnderecoChange}
-                  />
-                </div>
-              </div>
-            </FormSection>
-          </Card>
-        )}
+          {tipoCadastro === "cliente" && <ClienteCompleto form={cliente} atualizar={atualizarCliente} />}
 
-        <Card className="px-6">
-        <FormSection
-          title="Tipo de cadastro"
-          description="Classificação do cadastro no sistema."
-        >
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Cadastro:</label>
-              <RadioGroup
-                name="tipoCadastro"
-                value={tipoCadastro}
-                onValueChange={setTipoCadastro}
-                className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
-              >
-                <RadioGroupItem value="cliente" label="Cliente" />
-                <RadioGroupItem value="fornecedor" label="Fornecedor" />
-                <RadioGroupItem value="representante" label="Representante" />
-              </RadioGroup>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Cadastro especial:</label>
-              <RadioGroup
-                name="cadastroEspecial"
-                value={cadastroEspecial}
-                onValueChange={setCadastroEspecial}
-                className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
-              >
-                <RadioGroupItem value="loja" label="Loja" />
-                <RadioGroupItem value="usuario" label="Usuário" />
-                <RadioGroupItem value="usuario-pagador" label="Usuário Pagador" />
-                <RadioGroupItem value="banco" label="Banco" />
-              </RadioGroup>
-            </div>
-          </div>
-        </FormSection>
-        </Card>
-
-        {tipoCadastro === "fornecedor" && (
-          <Card className="px-6">
-            <FormSection
-              title="Fornecedor de entregas"
-              description="Aparece em entregas nas OS ou abre em contas a pagar."
-            >
-              <RadioGroup
-                name="tipoRastreioEntrega"
-                value={tipoRastreioEntrega}
-                onValueChange={setTipoRastreioEntrega}
-                className="flex-row flex-wrap items-center gap-x-6 gap-y-3"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="numero_pedido" />
-                  <Input
-                    placeholder="Nº do Pedido"
-                    className="h-9 w-40"
-                    value={numeroPedidoEntrega}
-                    onChange={(e) => setNumeroPedidoEntrega(e.target.value)}
-                    disabled={tipoRastreioEntrega !== "numero_pedido"}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="motorista" />
-                  <Input
-                    placeholder="Motorista"
-                    className="h-9 w-40"
-                    value={motoristaEntrega}
-                    onChange={(e) => setMotoristaEntrega(e.target.value)}
-                    disabled={tipoRastreioEntrega !== "motorista"}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="solicitado_por" />
-                  <Input
-                    placeholder="Solicitado por"
-                    className="h-9 w-40"
-                    value={solicitadoPorEntrega}
-                    onChange={(e) => setSolicitadoPorEntrega(e.target.value)}
-                    disabled={tipoRastreioEntrega !== "solicitado_por"}
-                  />
-                </div>
-                <RadioGroupItem value="retirada" label="Retirada" />
-                <RadioGroupItem value="entrega" label="Entrega" />
-              </RadioGroup>
-            </FormSection>
-          </Card>
-        )}
-
-        <Card className="px-6">
-        <FormSection
-          title="Acesso"
-          description="Identificação do usuário para login e fila de atendimento."
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Apelido de usuário</label>
-              <Input placeholder="Como o usuário aparece no sistema" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Acesso Whatsapp</label>
-              <Input placeholder="(00) 00000-0000" />
-            </div>
-          </div>
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <Checkbox />
-            <span className="text-sm text-foreground">
-              Usuário vendedor loga na fila de vendas
-            </span>
-          </label>
-        </FormSection>
-        </Card>
-
-        <Card className="px-6">
-        <FormSection title="Senha" description="Política de senha do usuário.">
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <Checkbox
-              checked={senhaManual}
-              onCheckedChange={(checked) => setSenhaManual(checked === true)}
+          {tipoCadastro === "cliente" && (
+            <EnderecoCampos
+              endereco={cliente.endereco}
+              onChange={(endereco) => atualizarCliente({ endereco })}
+              descricao="Endereço do cliente."
             />
-            <span className="text-sm text-foreground">Definir senha manualmente</span>
-          </label>
-
-          {senhaManual && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Senha</label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Senha"
-                    className="pr-9"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Repetir senha</label>
-                <Input type={showPassword ? "text" : "password"} placeholder="Repetir senha" />
-              </div>
-            </div>
+          )}
+          {tipoCadastro === "fornecedor" && (
+            <EnderecoCampos
+              endereco={pessoa.endereco}
+              onChange={(endereco) => atualizarPessoa({ endereco })}
+              descricao="Endereço comercial do fornecedor."
+            />
           )}
 
-          <div className="flex items-center gap-2 max-w-xs">
-            <label className="text-sm font-medium whitespace-nowrap">
-              Trocar a senha a cada
-            </label>
-            <Input type="number" min={0} placeholder="0" className="w-20" />
-            <span className="text-sm text-muted-foreground whitespace-nowrap">dias</span>
-          </div>
-
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <Checkbox
-              checked={trocarProximoAcesso}
-              onCheckedChange={(checked) => setTrocarProximoAcesso(checked === true)}
-            />
-            <span className="text-sm text-foreground">Trocar senha no próximo acesso</span>
-          </label>
-        </FormSection>
-        </Card>
-
-        <Card className="px-6">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFuncTab("usuario")}
-              className={cn(
-                "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                funcTab === "usuario"
-                  ? "bg-login-button-bg text-white"
-                  : "border border-input text-foreground hover:bg-muted"
-              )}
-            >
-              Usuário Funcionário
-            </button>
-            <button
-              type="button"
-              onClick={() => setFuncTab("direitos")}
-              className={cn(
-                "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                funcTab === "direitos"
-                  ? "bg-login-button-bg text-white"
-                  : "border border-input text-foreground hover:bg-muted"
-              )}
-            >
-              Direitos de Acesso
-            </button>
-          </div>
-
-          {funcTab === "direitos" ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              Direitos de acesso ainda não configurados para esta tela.
-            </p>
-          ) : (
-            <div className="space-y-8 pt-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium">Horário de trabalho</label>
+          <Card className="px-6">
+            <FormSection title="Tipo de cadastro" description="Classificação do cadastro no sistema.">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Cadastro:</p>
                   <RadioGroup
-                    name="horarioModo"
-                    value={horarioModo}
-                    onValueChange={setHorarioModo}
-                    className="flex-row gap-4"
+                    name="tipoCadastro"
+                    value={tipoCadastro}
+                    onValueChange={(v) => {
+                      if (!editando) setTipoCadastro(v as TipoCadastro);
+                    }}
+                    className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
                   >
-                    <RadioGroupItem value="livre" label="Livre" />
-                    <RadioGroupItem value="controla" label="Controla horário" />
+                    {TIPOS_CADASTRO.map((t) => (
+                      <RadioGroupItem
+                        key={t.value}
+                        id={`tipo-${t.value}`}
+                        value={t.value}
+                        label={t.label}
+                        disabled={editando && t.value !== tipoCadastro}
+                      />
+                    ))}
                   </RadioGroup>
-                </div>
-
-                <RadioGroup
-                  name="horarioDia"
-                  value={horarioDia}
-                  onValueChange={setHorarioDia}
-                  className="contents"
-                >
-                  <div className="overflow-x-auto rounded-lg border border-input">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-input bg-muted/50">
-                          <th className="w-32" />
-                          {TIME_FIELDS.map((field) => (
-                            <th
-                              key={field}
-                              className="px-2 py-2 text-left text-xs font-medium text-muted-foreground"
-                            >
-                              {field}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {WEEK_DAYS.map((day) => (
-                          <tr key={day} className="border-b border-input last:border-0">
-                            <td className="px-2 py-1.5 whitespace-nowrap">
-                              <RadioGroupItem value={day.toLowerCase()} label={day} />
-                            </td>
-                            {TIME_FIELDS.map((field) => (
-                              <td key={field} className="px-2 py-1.5">
-                                <div className="relative">
-                                  <Input
-                                    placeholder={field}
-                                    className="pr-7 text-xs h-8"
-                                  />
-                                  <Clock className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-                                </div>
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </RadioGroup>
-
-                <div className="flex flex-wrap items-center gap-6 pt-1">
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">
-                      Autoriza visualizar fora do horário de trabalho
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">
-                      Autoriza trabalhar fora do horário de trabalho
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-3 border-t border-border pt-6">
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <Checkbox
-                    checked={usuarioVendedor}
-                    onCheckedChange={(checked) => setUsuarioVendedor(checked === true)}
-                  />
-                  <span className="text-sm text-foreground">
-                    Usuário vendedor — usa parâmetros do horário para fila de vendas
-                  </span>
-                </label>
-
-                <p className="text-sm font-medium pt-2">
-                  Usuários vendedores — parâmetros da fila de atendimento
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-                  <span>Aceita</span>
-                  <Select defaultValue="0">
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[0, 1, 2, 3, 4, 5].map((n) => (
-                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span>vendedores no mesmo horário de almoço/intervalo</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-                  <Select defaultValue="10">
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[5, 10, 15, 20, 30].map((n) => (
-                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span>
-                    minutos antes de iniciar horário de intervalo passa para último na fila de
-                    atendimento
-                  </span>
-                </div>
-
-                <RadioGroup
-                  name="filaOpcao"
-                  value={filaOpcao}
-                  onValueChange={setFilaOpcao}
-                  className="gap-2.5 pt-2"
-                >
-                  {FILA_OPCOES.map((opcao) => (
-                    <RadioGroupItem key={opcao} value={opcao} label={opcao} />
-                  ))}
-                </RadioGroup>
-              </div>
-
-              <div className="space-y-3 border-t border-border pt-6">
-                <p className="text-sm font-medium">
-                  IPs de acesso cadastrado para este usuário
-                </p>
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <Checkbox
-                    checked={ipsLivre}
-                    onCheckedChange={(checked) => setIpsLivre(checked === true)}
-                  />
-                  <span className="text-sm text-foreground">Livre</span>
-                </label>
-                <Button size="sm" variant="outline">
-                  <Plus className="size-3.5" />
-                  Cadastrar IP
-                </Button>
-                <div className="space-y-1.5 pt-1">
-                  <p className="flex items-center gap-1.5 text-sm font-medium">
-                    <List className="size-3.5" />
-                    IPs liberados para este usuário
-                  </p>
-                  <Badge variant="muted">Computador Loja</Badge>
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card className="px-6">
-          <FormSection
-            title="Dados de admissão"
-            description="Informações de admissão, cargo e salário do funcionário."
-          >
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <Checkbox
-                checked={usuarioFuncionario}
-                onCheckedChange={(checked) => setUsuarioFuncionario(checked === true)}
-              />
-              <span className="text-sm text-foreground">Usuário funcionário</span>
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Data de admissão</label>
-                <Input type="date" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">PIS/PASEP</label>
-                <Input placeholder="PIS/PASEP" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">No. CTPS</label>
-                <Input placeholder="Número da CTPS" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Série</label>
-                <Input placeholder="Série" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">UF</label>
-                <Input placeholder="UF" maxLength={2} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Data de saída</label>
-                <Input type="date" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Cargo</label>
-                <Input placeholder="Cargo" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Piso categoria</label>
-                <Input placeholder="Piso categoria" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Salário de registro</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Repasse reajuste anual</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Salário reajustado ano base</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Novo valor</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Percentual</label>
-                <Input placeholder="0%" />
-              </div>
-            </div>
-
-            <div className="space-y-3 border-t border-border pt-6">
-              <label className="text-sm font-medium">Gerar licença</label>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">De</label>
-                  <Input type="date" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">A</label>
-                  <Input type="date" />
-                </div>
-                <Button size="sm">
-                  <Plus className="size-3.5" />
-                  Incluir
-                </Button>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Licenças geradas</label>
-                <Textarea placeholder="Nenhuma licença gerada" readOnly className="min-h-24" />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
-              <Button variant="outline" size="sm">Alterar</Button>
-              <Button size="sm">Gravar</Button>
-            </div>
-          </FormSection>
-        </Card>
-
-        <Card className="px-6">
-          <FormSection
-            title="Adicionais"
-            description="Adicionais de remuneração aplicados ao salário do funcionário."
-          >
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <Checkbox
-                checked={insalubridade}
-                onCheckedChange={(checked) => setInsalubridade(checked === true)}
-              />
-              <span className="text-sm font-medium text-foreground">
-                Incluir adicional de insalubridade
-              </span>
-            </label>
-
-            {insalubridade && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Base de cálculo sobre salário mínimo vigente
-                  </label>
-                  <Input placeholder="R$ 0,00" />
+                  {editando && (
+                    <p className="text-xs text-muted-foreground">O tipo não muda ao alterar um cadastro existente.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
+                  <p className="text-sm font-medium">Cadastro especial:</p>
                   <RadioGroup
-                    name="insalubridadeNivel"
-                    value={insalubridadeNivel}
-                    onValueChange={setInsalubridadeNivel}
-                    className="gap-2"
+                    name="cadastroEspecial"
+                    value={cadastroEspecial}
+                    onValueChange={setCadastroEspecial}
+                    className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
                   >
-                    <RadioGroupItem value="baixa" label="Insalubridade baixa — 10%" />
-                    <RadioGroupItem value="media" label="Insalubridade média — 20%" />
-                    <RadioGroupItem value="alta" label="Insalubridade alta — 40%" />
+                    <RadioGroupItem id="especial-loja" value="loja" label="Loja" />
+                    <RadioGroupItem id="especial-usuario" value="usuario" label="Usuário" />
+                    <RadioGroupItem id="especial-usuario-pagador" value="usuario-pagador" label="Usuário Pagador" />
+                    <RadioGroupItem id="especial-banco" value="banco" label="Banco" />
                   </RadioGroup>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Valor adicional</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
               </div>
-            )}
+            </FormSection>
+          </Card>
 
-            <label className="flex items-center gap-2.5 cursor-pointer border-t border-border pt-6">
-              <Checkbox
-                checked={periculosidade}
-                onCheckedChange={(checked) => setPericulosidade(checked === true)}
-              />
-              <span className="text-sm font-medium text-foreground">
-                Incluir adicional de periculosidade
-              </span>
-            </label>
+          {tipoCadastro === "fornecedor" && (
+            <FornecedorCompleto form={pessoa} atualizar={atualizarPessoa} editando={editando} />
+          )}
 
-            {periculosidade && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Base de cálculo sobre salário bruto do beneficiado
-                    <span className="ml-1 text-xs text-muted-foreground">(Alíquota 30%)</span>
-                  </label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Descrição da periculosidade</label>
-                  <Textarea placeholder="Descrição" className="min-h-20" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Valor adicional</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-              </div>
-            )}
-          </FormSection>
-        </Card>
+          {tipoCadastro === "funcionario" && <FuncionarioSecoes />}
 
-        <Card className="px-6">
-          <FormSection
-            title="Benefícios"
-            description="Benefícios recorrentes pagos ao funcionário."
-          >
-            <div className="space-y-3">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox
-                  checked={valeTransporte}
-                  onCheckedChange={(checked) => setValeTransporte(checked === true)}
-                />
-                <span className="text-sm font-medium text-foreground">
-                  Pagamento vale transporte
-                </span>
-              </label>
-
-              {valeTransporte && (
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <DiasTrabalho
-                    selected={valeTransporteDias}
-                    onToggle={(i) => toggleDia(setValeTransporteDias, i)}
-                  />
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Valor do vale de transporte</label>
-                    <Input placeholder="R$ 0,00" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">
-                      Funcionário necessita de passagem por dia
-                    </label>
-                    <Input placeholder="0" />
-                  </div>
-                  <label className="flex items-center gap-2.5 cursor-pointer sm:col-span-3">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">
-                      Gera automaticamente como conta previsão no 1º dia útil de cada mês
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3 border-t border-border pt-6">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox
-                  checked={valeAlimentacao}
-                  onCheckedChange={(checked) => setValeAlimentacao(checked === true)}
-                />
-                <span className="text-sm font-medium text-foreground">
-                  Pagamento vale alimentação
-                </span>
-              </label>
-
-              {valeAlimentacao && (
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <DiasTrabalho
-                    selected={valeAlimentacaoDias}
-                    onToggle={(i) => toggleDia(setValeAlimentacaoDias, i)}
-                  />
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Valor do vale de alimentação</label>
-                    <Input placeholder="R$ 0,00" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">
-                      Funcionário necessita de passagem por dia
-                    </label>
-                    <Input placeholder="0" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Fornecedor do vale alimentação</label>
-                    <Select>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="alelo">Alelo</SelectItem>
-                        <SelectItem value="sodexo">Sodexo</SelectItem>
-                        <SelectItem value="vr">VR Benefícios</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <label className="flex items-center gap-2.5 cursor-pointer sm:col-span-3">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">
-                      Gera automaticamente como conta previsão no 1º dia útil de cada mês
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3 border-t border-border pt-6">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox
-                  checked={cestaBasica}
-                  onCheckedChange={(checked) => setCestaBasica(checked === true)}
-                />
-                <span className="text-sm font-medium text-foreground">
-                  Pagamento de cesta básica e outros
-                </span>
-              </label>
-
-              {cestaBasica && (
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <DiasTrabalho
-                    selected={cestaBasicaDias}
-                    onToggle={(i) => toggleDia(setCestaBasicaDias, i)}
-                  />
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Valor da cesta básica</label>
-                    <Input placeholder="R$ 0,00" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">
-                      Funcionário necessita de passagem por dia
-                    </label>
-                    <Input placeholder="0" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">
-                      Aplicar desconto na folha de pagamentos
-                    </label>
-                    <Input placeholder="0%" />
-                  </div>
-                  <label className="flex items-center gap-2.5 cursor-pointer sm:col-span-3">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">
-                      Gera automaticamente como conta previsão no 1º dia útil de cada mês
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3 border-t border-border pt-6">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox
-                  checked={planoSaude}
-                  onCheckedChange={(checked) => setPlanoSaude(checked === true)}
-                />
-                <span className="text-sm font-medium text-foreground">
-                  Pagamento plano de saúde
-                </span>
-              </label>
-
-              {planoSaude && (
-                <>
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Fornecedor de plano de saúde</label>
-                      <Select>
-                        <SelectTrigger className="w-56">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unimed">Unimed</SelectItem>
-                          <SelectItem value="amil">Amil</SelectItem>
-                          <SelectItem value="bradesco">Bradesco Saúde</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Valor do benefício</label>
-                      <Input placeholder="R$ 0,00" />
-                    </div>
-                    <Button size="icon" variant="outline" aria-label="Adicionar plano">
-                      <Plus className="size-4" />
-                    </Button>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-lg border border-input">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr>
-                          {["Plano", "Usuário", "Valor"].map((col) => (
-                            <th key={col} className="p-2">
-                              <span className="inline-block rounded bg-login-button-bg px-2.5 py-1 text-xs font-semibold uppercase text-white">
-                                {col}
-                              </span>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <tr key={i}>
-                            <td className="p-2"><Input className="h-8" /></td>
-                            <td className="p-2"><Input className="h-8" /></td>
-                            <td className="p-2"><Input className="h-8" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">Benefício da empresa</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">Aplicar desconto em folha de</span>
-                    <Input placeholder="0" className="w-16 h-8" />
-                    <span className="text-sm text-foreground">% do valor do plano</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox />
-                    <span className="text-sm text-foreground">
-                      Gera automaticamente como conta previsão na data do dia
-                    </span>
-                    <Input type="date" className="w-40 h-8" />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button size="sm">Gerar financeiro</Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </FormSection>
-        </Card>
-
-        <Card className="px-6">
-          <FormSection title="Férias" description="Controle de período aquisitivo e concessão de férias.">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Período aquisitivo — de</label>
-                <Input type="date" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Período aquisitivo — a</label>
-                <Input type="date" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  Dias de férias a ser gozada (sem direito ainda)
-                </label>
-                <Input placeholder="0" />
-              </div>
-              <Button size="sm">Conceder férias</Button>
-            </div>
-
-            <div className="space-y-4 border-t border-border pt-6">
-              <p className="text-sm font-medium">
-                Férias concedida: 30 dias / fracionada / 20 dias com compra de 10
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">De</label>
-                  <Input type="date" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">A</label>
-                  <Input type="date" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Valor das férias</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Adicional 1/3</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">IR alíquota</label>
-                  <Input placeholder="0%" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">IR valor</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">FGTS alíquota</label>
-                  <Input placeholder="0%" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">FGTS valor</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">INSS alíquota</label>
-                  <Input placeholder="0%" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">INSS valor</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-sm font-medium">Valor líquido de férias</label>
-                  <Input placeholder="R$ 0,00" />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-end gap-6">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Dias concedidos</label>
-                  <Input placeholder="0" className="w-24" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Dias restantes</label>
-                  <Input placeholder="0" className="w-24" />
-                </div>
-                <Button size="sm">Gerar financeiro</Button>
-              </div>
-
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox />
-                <span className="text-sm text-foreground">
-                  Gera automaticamente como conta previsão ao término de cada doze meses
-                </span>
-              </label>
-            </div>
-          </FormSection>
-        </Card>
-
-        <Card className="px-6">
-          <FormSection title="13º Salário" description="Cálculo e pagamento do décimo terceiro salário.">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Data de admissão</label>
-                <Input type="date" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Ano corrente</label>
-                <Input placeholder="2026" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Medida últimos 12 meses</label>
-                <Input placeholder="0" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Dividido por 12x</label>
-                <Input placeholder="0" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Valor líquido 1ª parcela</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">2ª parcela</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Alíq. INSS</label>
-                <Input placeholder="0%" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Valor INSS</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Alíq. FGTS</label>
-                <Input placeholder="0%" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Valor FGTS</label>
-                <Input placeholder="R$ 0,00" />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-end gap-3 border-t border-border pt-6">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox />
-                <span className="text-sm text-foreground">
-                  Gera automaticamente como conta previsão na data do dia
-                </span>
-              </label>
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">De</label>
-                <Input type="date" className="w-40" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">A</label>
-                <Input type="date" className="w-40" />
-              </div>
-              <Button size="sm">Gerar financeiro</Button>
-            </div>
-          </FormSection>
-        </Card>
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="outline" asChild>
-            <Link href="/">Cancelar</Link>
-          </Button>
-          <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Salvando..." : "Salvar"}
-          </Button>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button variant="outline" asChild>
+              <Link href="/">Cancelar</Link>
+            </Button>
+            <Button onClick={handleSave} disabled={salvando}>
+              {salvando ? "Gravando..." : "Gravar"}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

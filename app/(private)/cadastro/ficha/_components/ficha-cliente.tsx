@@ -129,7 +129,7 @@ function FinanceiroCliente({ cliente }: { cliente: Person }) {
         )}
       />
       {detalhesAberto && <PopupFinanceiro open onOpenChange={setDetalhesAberto} nome={cliente.name} />}
-      {nfeAberto && <PopupNfe open onOpenChange={setNfeAberto} origem="financeiro" />}
+      {nfeAberto && <PopupNfe open onOpenChange={setNfeAberto} />}
     </>
   );
 }
