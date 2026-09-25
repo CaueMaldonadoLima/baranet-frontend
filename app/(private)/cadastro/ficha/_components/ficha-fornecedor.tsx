@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, RefreshCw, Wallet } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, RefreshCw, Settings, Wallet } from "lucide-react";
 import { Badge } from "@/components/shared/badge";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -120,6 +121,17 @@ export function FichaFornecedor({ supplierId }: { supplierId: number }) {
   }, [supplierId, tentativa]);
 
   const columns: Column<Supplier>[] = [
+    {
+      header: "",
+      className: "w-12",
+      cell: (row) => (
+        <Button size="xs" variant="ghost" asChild>
+          <Link href={`/cadastro?tipo=fornecedor&id=${row.id}`} aria-label="Editar cadastro do fornecedor" title="Editar cadastro">
+            <Settings className="size-3.5" />
+          </Link>
+        </Button>
+      ),
+    },
     { header: "Código fornecedor", accessor: "id", className: "w-40" },
     {
       header: "Status",

@@ -135,20 +135,200 @@ export interface LabOrder {
   sentDate: string;
   dueDate: string;
 }
+/** Bloco "Produtos para consumo" / "Mercadoria para revenda" do fornecedor */
+export interface SupplierProductBlock {
+  enabled: boolean;
+  types: string[];
+  brands: string[];
+}
+export interface SupplierDeliveryFinance {
+  generatesPayablePerOrder: boolean;
+  batchOrderClosing: boolean;
+  enableCustomerBilling: boolean;
+}
+export interface SupplierCard {
+  dueDay: number | null;
+  closingDay: number | null;
+  limit: number | null;
+}
+export interface SupplierFiscalRules {
+  financialClosingEnabled: boolean;
+  financialClosingDays: number | null;
+  autoFinanceOnXml: boolean;
+  isRealProfitExpense: boolean;
+  keepSalePriceOnXml: boolean;
+  divergenceCreatesCreditTask: boolean;
+}
+export interface SupplierEmail {
+  id?: number;
+  description: string | null;
+  sector: string | null;
+  email: string;
+}
+/** Referência genérica id + nome (lojas, funcionários, autorizados) */
+export interface IdNome {
+  id: number;
+  name: string;
+}
+/** Loja ou funcionário autorizado a usar o serviço do fornecedor */
+export type SupplierAllowed = IdNome;
+export interface SupplierLaboratory {
+  id?: number;
+  slot: number;
+  active: boolean;
+  name: string | null;
+}
+/** Papel fornecedor sobre uma Pessoa (GET /suppliers/{id}) — schema Supplier do Swagger */
 export interface Supplier {
   id: number;
   /** Pessoa por trás do papel fornecedor (ver Person) */
   personId: number;
+  personType?: "fisica" | "juridica" | null;
+  /** Nome de exibição (tradeName ou legalName) */
+  name: string;
+  legalName?: string | null;
+  tradeName?: string | null;
+  /** CPF (11) ou CNPJ (14), só dígitos */
+  document?: string | null;
+  /** Alias de document (compat) */
+  cnpj: string | null;
+  ddd?: string | null;
+  phone: string | null;
+  email?: string | null;
   /** Status do papel fornecedor — independe do status da Pessoa */
   status?: "ativo" | "inativo";
-  name: string;
-  cnpj: string;
-  contact: string;
-  phone: string;
-  email: string;
-  category: string;
-  lastOrder: string;
+  siteUrl?: string | null;
+  stateRegistration?: string | null;
+  contact?: string | null;
+  category?: string | null;
+  supplierOf?: string | null;
+  accountingGroup?: string | null;
+  defaultCfop?: string | null;
+  taxRegime?: string | null;
+  purchaseCode?: string | null;
+  isDeliverySupplier?: boolean;
+  isUtilitiesSupplier?: boolean;
+  isCardSupplier?: boolean;
+  deliveryFinance?: Partial<SupplierDeliveryFinance>;
+  card?: Partial<SupplierCard>;
+  fiscalRules?: Partial<SupplierFiscalRules>;
+  consumptionProducts?: Partial<SupplierProductBlock>;
+  resaleProducts?: Partial<SupplierProductBlock>;
+  address?: Partial<PersonAddress>;
+  emails?: SupplierEmail[];
+  laboratories?: SupplierLaboratory[];
+  allowedStores?: SupplierAllowed[];
+  allowedUsers?: SupplierAllowed[];
+  lastOrder: string | null;
   totalOrders: number;
+}
+/** POST/PUT /suppliers — schema SupplierWrite do Swagger */
+export interface SupplierWrite {
+  personId?: number;
+  personType?: "fisica" | "juridica" | null;
+  name?: string | null;
+  legalName?: string | null;
+  tradeName?: string | null;
+  document?: string | null;
+  ddd?: string | null;
+  phone?: string | null;
+  status?: "ativo" | "inativo";
+  siteUrl?: string | null;
+  stateRegistration?: string | null;
+  supplierOf?: string | null;
+  accountingGroup?: string | null;
+  /** 4 dígitos */
+  defaultCfop?: string | null;
+  taxRegime?: string | null;
+  purchaseCode?: string | null;
+  email?: string | null;
+  contact?: string | null;
+  category?: string | null;
+  isDeliverySupplier?: boolean;
+  isUtilitiesSupplier?: boolean;
+  isCardSupplier?: boolean;
+  deliveryFinance?: SupplierDeliveryFinance;
+  card?: { dueDay?: number | null; closingDay?: number | null; limit?: number | null };
+  fiscalRules?: { financialClosingDays?: number | null } & Omit<SupplierFiscalRules, "financialClosingDays">;
+  consumptionProducts?: SupplierProductBlock;
+  resaleProducts?: SupplierProductBlock;
+  address?: Partial<Record<keyof PersonAddress, string | null>>;
+  emails?: { description?: string | null; sector?: string | null; email: string }[];
+  laboratories?: { slot: number; active: boolean; name?: string | null }[];
+  allowedStoreIds?: number[];
+  allowedUserIds?: number[];
+}
+/** Cliente como vem em GET /customers/{id} — schema Customer do Swagger */
+export interface CustomerDetail {
+  id: number;
+  personId: number;
+  personType?: "fisica" | "juridica" | null;
+  name: string;
+  document?: string | null;
+  ddd?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  status?: "ativo" | "inativo";
+  whatsapp?: string | null;
+  customerType?: string | null;
+  allowWithoutDocument?: boolean;
+  rg?: string | null;
+  birthDate?: string | null;
+  gender?: string | null;
+  maritalStatus?: string | null;
+  birthplace?: string | null;
+  commercialDdd?: string | null;
+  commercialPhone?: string | null;
+  extension?: string | null;
+  isForeigner?: boolean;
+  foreignerStatus?: string | null;
+  rgIssueDate?: string | null;
+  rgIssuer?: string | null;
+  rgState?: string | null;
+  nickname?: string | null;
+  photoUrl?: string | null;
+  socialNetworks?: CustomerSocialNetworks;
+  address?: Partial<PersonAddress>;
+  lastPurchase?: string | null;
+  registeredAt?: string | null;
+  updatedAt?: string | null;
+}
+export type CustomerSocialNetworks = Partial<
+  Record<"facebook" | "instagram" | "youtube" | "twitter" | "tiktok", string | null>
+>;
+/** POST/PUT /customers — schema CustomerWrite do Swagger (campos da tela 02) */
+export interface CustomerWrite {
+  personId?: number;
+  personType?: "fisica" | "juridica" | null;
+  ddd?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  photoUrl?: string | null;
+  socialNetworks?: CustomerSocialNetworks;
+  name?: string | null;
+  document?: string | null;
+  status?: "ativo" | "inativo";
+  whatsapp?: string | null;
+  customerType?: string | null;
+  allowWithoutDocument?: boolean;
+  rg?: string | null;
+  birthDate?: string | null;
+  gender?: string | null;
+  maritalStatus?: string | null;
+  birthplace?: string | null;
+  commercialDdd?: string | null;
+  commercialPhone?: string | null;
+  extension?: string | null;
+  isForeigner?: boolean;
+  foreignerStatus?: string | null;
+  rgIssueDate?: string | null;
+  rgIssuer?: string | null;
+  rgState?: string | null;
+  nickname?: string | null;
+  country?: string | null;
+  address?: Partial<Record<keyof PersonAddress, string | null>>;
+  city?: string | null;
+  state?: string | null;
 }
 // Pessoa: cadastro-base (nome, documento, endereço) compartilhado pelos
 // papéis. Cliente, fornecedor, funcionário, médico e convênio são papéis
