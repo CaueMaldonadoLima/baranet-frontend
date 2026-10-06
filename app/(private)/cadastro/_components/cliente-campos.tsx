@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ClienteForm } from "../_lib/cliente-form";
+import { REDES_SOCIAIS, type ClienteForm } from "../_lib/cliente-form";
 import { Campo } from "./campo";
 
 const UFS = [
@@ -93,7 +93,7 @@ export function ClienteRapido({
             Foto
           </Button>
           <Button size="sm" asChild>
-            <Link href="/cadastro/ficha?aba=cliente">
+            <Link href="/cadastro?aba=cliente">
               <Search className="size-3.5" />
               Busca
             </Link>
@@ -112,7 +112,7 @@ export function ClienteRapido({
             </Button>
           </div>
         )}
-        <Button size="sm" variant="secondary" disabled={!foto} onClick={() => setFoto(null)}>
+        <Button size="sm" disabled={!foto} onClick={() => setFoto(null)}>
           Excluir foto do cliente
         </Button>
       </div>
@@ -186,7 +186,7 @@ export function ClienteRapido({
 export function ClienteCompleto({ form, atualizar }: { form: ClienteForm; atualizar: Atualizar }) {
   return (
     <Card className="px-6">
-      <FormSection title="Cadastro completo" description="Documentos e dados pessoais do cliente.">
+      <FormSection title="Cadastro completo">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Campo id="cliente-rg" label="RG">
             <Input id="cliente-rg" placeholder="RG" value={form.rg} onChange={(e) => atualizar({ rg: e.target.value })} />
@@ -355,6 +355,27 @@ export function ClienteCompleto({ form, atualizar }: { form: ClienteForm; atuali
               />
             </Campo>
           </div>
+        </div>
+      </FormSection>
+    </Card>
+  );
+}
+
+export function ClienteRedesSociais({ form, atualizar }: { form: ClienteForm; atualizar: Atualizar }) {
+  return (
+    <Card className="px-6">
+      <FormSection title="Redes sociais">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {REDES_SOCIAIS.map((r) => (
+            <Campo key={r.key} id={`cliente-rede-${r.key}`} label={r.label}>
+              <Input
+                id={`cliente-rede-${r.key}`}
+                placeholder="@usuario ou link"
+                value={form.redesSociais[r.key]}
+                onChange={(e) => atualizar({ redesSociais: { ...form.redesSociais, [r.key]: e.target.value } })}
+              />
+            </Campo>
+          ))}
         </div>
       </FormSection>
     </Card>

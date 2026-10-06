@@ -1,374 +1,428 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
-import { Breadcrumb } from "@/components/shared/breadcrumb";
-import { Badge } from "@/components/shared/badge";
+import { AlertCircle, List, Plus, Search, Settings } from "lucide-react";
+import { DataTable, type Column } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormSection } from "@/components/shared/form-section";
-import { Skeleton } from "@/components/shared/skeleton";
+import { Pagination } from "@/components/shared/pagination";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shared/tabs";
+import { useToast } from "@/components/shared/toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/components/shared/toast";
-import { customersService, suppliersService } from "@/services/erp";
-import { ApiRequestError, mensagemDeErro } from "@/services/types";
-import { Campo } from "./_components/campo";
-import { ClienteCompleto, ClienteRapido } from "./_components/cliente-campos";
-import { EnderecoCampos } from "./_components/endereco-campos";
-import { FornecedorCompleto } from "./_components/fornecedor-completo";
-import { FuncionarioSecoes } from "./_components/funcionario-secoes";
-import { PessoaRapido } from "./_components/pessoa-rapido";
-import {
-  clienteParaForm,
-  clienteVazio,
-  formParaClienteWrite,
-  validarCliente,
-  type ClienteForm,
-} from "./_lib/cliente-form";
-import {
-  fornecedorParaForm,
-  fornecedorVazio,
-  formParaFornecedorWrite,
-  validarFornecedor,
-  type FornecedorForm,
-} from "./_lib/fornecedor-form";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/shared/badge";
+import { peopleService } from "@/services/erp";
+import { mensagemDeErro, type Person, type PersonRole } from "@/services/types";
+import { FichaCliente } from "./_components/ficha/ficha-cliente";
+import { FichaFornecedor } from "./_components/ficha/ficha-fornecedor";
+import { AbaFinanceiro } from "./_components/ficha/popup-financeiro";
 
-const TIPOS_CADASTRO = [
-  { value: "cliente", label: "Cliente" },
-  { value: "fornecedor", label: "Fornecedor" },
-  { value: "funcionario", label: "Funcionário" },
-  { value: "representante", label: "Representante" },
-] as const;
+// Abas da ficha. Cada uma é um papel sobre a mesma Pessoa (GET /people?role=)
+// — ver ADR 0002. Financeiro não é papel: na API é visão operacional de
+// saldos, então a aba busca em todas as pessoas.
+const ABAS = [
+  { value: "cliente", label: "Cliente", role: "customer", tipoCadastro: "cliente" },
+  { value: "fornecedor", label: "Fornecedor", role: "supplier", tipoCadastro: "fornecedor" },
+  { value: "usuario", label: "Usuário", role: "employee", tipoCadastro: "funcionario" },
+  { value: "financeiro", label: "Financeiro", role: null, tipoCadastro: null },
+  { value: "medico", label: "Médico / Optometrista", role: "doctor", tipoCadastro: null },
+  { value: "convenio", label: "Convênio", role: "agreement", tipoCadastro: null },
+] as const satisfies readonly {
+  value: string;
+  label: string;
+  role: PersonRole | null;
+  /** Tipo que /cadastro/novo já sabe abrir via ?tipo= */
+  tipoCadastro: string | null;
+}[];
 
-type TipoCadastro = (typeof TIPOS_CADASTRO)[number]["value"];
+type Aba = (typeof ABAS)[number]["value"];
 
-/** Aba da ficha que lista cada tipo (o "Alterar" abre a busca nela) */
-const ABA_DA_FICHA: Record<TipoCadastro, string | null> = {
-  cliente: "cliente",
-  fornecedor: "fornecedor",
-  funcionario: "usuario",
-  representante: null,
+function ehAba(valor: string | undefined): valor is Aba {
+  return ABAS.some((a) => a.value === valor);
+}
+
+/** Formulário de cadastro do papel da aba, se a pessoa tiver esse papel */
+function linkEdicao(pessoa: Person, aba: Aba): string | null {
+  if (aba === "cliente" && pessoa.customerId !== null) return `/cadastro/cliente/${pessoa.customerId}`;
+  if (aba === "fornecedor" && pessoa.supplierId !== null) return `/cadastro/fornecedor/${pessoa.supplierId}`;
+  return null;
+}
+
+const PAPEL_LABEL: Record<PersonRole, string> = {
+  customer: "Cliente",
+  supplier: "Fornecedor",
+  employee: "Usuário",
+  doctor: "Médico",
+  agreement: "Convênio",
 };
 
-function ehTipo(valor: string | undefined): valor is TipoCadastro {
-  return TIPOS_CADASTRO.some((t) => t.value === valor);
+// Cada campo vira um filtro próprio de GET /people (a API ignora máscaras).
+const CAMPOS_BUSCA = [
+  { key: "name", label: "Nome / Código", placeholder: "Nome ou código" },
+  { key: "document", label: "CPF / CNPJ", placeholder: "000.000.000-00" },
+  { key: "whatsapp", label: "Whatsapp", placeholder: "(00) 00000-0000" },
+] as const;
+
+type CampoBusca = (typeof CAMPOS_BUSCA)[number]["key"];
+
+interface Busca {
+  campo: CampoBusca;
+  termo: string;
 }
 
-type Carregamento = { status: "ok" } | { status: "carregando" } | { status: "erro"; mensagem: string };
-
-// /cadastro?tipo=<tipo> abre um cadastro novo naquele tipo; com &id=<id>
-// (cliente ou fornecedor) carrega o registro existente para alterar. A ficha
-// (/cadastro/ficha) abre esta tela nos dois modos.
-export default function CadastroPage({
+// Entrada do cadastro: busca + lista. ?aba=<aba> abre a ficha naquela aba (o
+// "Alterar" e o "Cancelar" do formulário voltam para cá).
+export default function FichaCadastroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tipo?: string; id?: string }>;
+  searchParams: Promise<{ aba?: string }>;
 }) {
-  const { tipo, id } = use(searchParams);
-  const tipoInicial: TipoCadastro = ehTipo(tipo) ? tipo : "cliente";
-  const idNum =
-    id && /^\d+$/.test(id) && (tipoInicial === "cliente" || tipoInicial === "fornecedor")
-      ? Number(id)
-      : null;
-  // "Incluir" num cadastro novo não muda a URL: este contador remonta o formulário.
-  const [novo, setNovo] = useState(0);
-
-  return (
-    <FormularioCadastro
-      key={`${tipoInicial}:${idNum ?? "novo"}:${novo}`}
-      tipoInicial={tipoInicial}
-      id={idNum}
-      onNovo={() => setNovo((n) => n + 1)}
-    />
-  );
-}
-
-function FormularioCadastro({
-  tipoInicial,
-  id,
-  onNovo,
-}: {
-  tipoInicial: TipoCadastro;
-  id: number | null;
-  onNovo: () => void;
-}) {
-  const router = useRouter();
+  const { aba: abaInicial } = use(searchParams);
   const toast = useToast();
-  const editando = id !== null;
 
-  const [tipoCadastro, setTipoCadastro] = useState<TipoCadastro>(tipoInicial);
-  const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
-  const [cliente, setCliente] = useState<ClienteForm>(clienteVazio);
-  // Fornecedor, funcionário e representante compartilham o cadastro rápido.
-  const [pessoa, setPessoa] = useState<FornecedorForm>(fornecedorVazio);
-  const [carregamento, setCarregamento] = useState<Carregamento>(
-    editando ? { status: "carregando" } : { status: "ok" }
-  );
-  const [tentativa, setTentativa] = useState(0);
-  const [salvando, setSalvando] = useState(false);
+  const [aba, setAba] = useState<Aba>(ehAba(abaInicial) ? abaInicial : "cliente");
+  const [campos, setCampos] = useState<Record<CampoBusca, string>>({
+    name: "",
+    document: "",
+    whatsapp: "",
+  });
+  const [os, setOs] = useState("");
+  const [nf, setNf] = useState("");
 
-  useEffect(() => {
-    if (id === null) return;
-    let ativo = true;
-    const carregar =
-      tipoInicial === "fornecedor"
-        ? suppliersService.get(id).then((s) => {
-            if (ativo) setPessoa(fornecedorParaForm(s));
-          })
-        : customersService.get(id).then((c) => {
-            if (ativo) setCliente(clienteParaForm(c));
-          });
-    carregar
-      .then(() => {
-        if (ativo) setCarregamento({ status: "ok" });
-      })
-      .catch((err) => {
-        if (ativo) setCarregamento({ status: "erro", mensagem: mensagemDeErro(err) });
-      });
-    return () => {
-      ativo = false;
-    };
-  }, [id, tipoInicial, tentativa]);
+  const [busca, setBusca] = useState<Busca | null>(null);
+  const [resultados, setResultados] = useState<Person[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [erroBusca, setErroBusca] = useState<string | null>(null);
+  const [mostrarResultados, setMostrarResultados] = useState(true);
+  const [selecionado, setSelecionado] = useState<Person | null>(null);
+  // Trocar de aba refaz a busca: só a resposta da última requisição vale.
+  const ultimaBuscaId = useRef(0);
 
-  const atualizarCliente = (patch: Partial<ClienteForm>) => setCliente((prev) => ({ ...prev, ...patch }));
-  const atualizarPessoa = (patch: Partial<FornecedorForm>) => setPessoa((prev) => ({ ...prev, ...patch }));
+  const abaAtual = ABAS.find((a) => a.value === aba)!;
 
-  const rotuloTipo = TIPOS_CADASTRO.find((t) => t.value === tipoCadastro)!.label;
-
-  function handleIncluir() {
-    toast.info(`Novo cadastro de ${rotuloTipo.toLowerCase()} iniciado.`);
-    if (editando) router.push(`/cadastro?tipo=${tipoCadastro}`);
-    else onNovo();
-  }
-
-  async function handleSave() {
-    if (tipoCadastro === "funcionario" || tipoCadastro === "representante") {
-      toast.info(
-        `Cadastro de ${tipoCadastro === "funcionario" ? "funcionário" : "representante"} ainda não disponível`,
-        "Este tipo de cadastro ainda não é gravado na API."
-      );
-      return;
-    }
-
-    const erro = tipoCadastro === "fornecedor" ? validarFornecedor(pessoa) : validarCliente(cliente);
-    if (erro) {
-      toast.warning(erro);
-      return;
-    }
-
-    setSalvando(true);
+  async function executarBusca(novaBusca: Busca, pagina: number, abaBusca: Aba = aba) {
+    const role = ABAS.find((a) => a.value === abaBusca)!.role ?? undefined;
+    const buscaId = ++ultimaBuscaId.current;
+    setLoading(true);
+    setErroBusca(null);
+    setBusca(novaBusca);
+    setMostrarResultados(true);
     try {
-      let salvoId: number;
-      if (tipoCadastro === "fornecedor") {
-        const payload = formParaFornecedorWrite(pessoa, editando ? "editar" : "criar");
-        salvoId = (editando ? await suppliersService.update(id, payload) : await suppliersService.create(payload)).id;
-      } else {
-        const payload = formParaClienteWrite(cliente, editando ? "editar" : "criar");
-        salvoId = (editando ? await customersService.update(id, payload) : await customersService.create(payload)).id;
-      }
-      const rotulo = tipoCadastro === "fornecedor" ? "Fornecedor" : "Cliente";
-      toast.success(editando ? `${rotulo} atualizado.` : `${rotulo} cadastrado com sucesso.`);
-      // Depois de criar, a tela passa a editar o registro: um novo Gravar atualiza, não duplica.
-      if (!editando) router.replace(`/cadastro?tipo=${tipoCadastro}&id=${salvoId}`);
+      const res = await peopleService.list({
+        [novaBusca.campo]: novaBusca.termo,
+        role,
+        page: pagina,
+      });
+      if (buscaId !== ultimaBuscaId.current) return;
+      setResultados(res.data);
+      setTotalPages(res.meta?.last_page ?? 1);
+      setPage(pagina);
     } catch (err) {
-      if (err instanceof ApiRequestError) {
-        const primeiroErroDeCampo = err.errors && Object.values(err.errors)[0]?.[0];
-        toast.error(err.message, primeiroErroDeCampo);
-      } else {
-        toast.error("Não foi possível salvar o cadastro.", "Verifique sua conexão e tente novamente.");
-      }
+      if (buscaId !== ultimaBuscaId.current) return;
+      setResultados([]);
+      setTotalPages(1);
+      setErroBusca(mensagemDeErro(err));
     } finally {
-      setSalvando(false);
+      if (buscaId === ultimaBuscaId.current) setLoading(false);
     }
   }
 
-  const abaDaFicha = ABA_DA_FICHA[tipoCadastro];
+  function handleBuscar(campo: CampoBusca) {
+    const termo = campos[campo].trim();
+    if (!termo) {
+      toast.warning("Digite algo para buscar.");
+      return;
+    }
+    executarBusca({ campo, termo }, 1);
+  }
 
-  const seletorTipo = (
-    <Campo id="cadastrar-como" label="Cadastrar como">
-      <Select value={tipoCadastro} onValueChange={(v) => setTipoCadastro(v as TipoCadastro)} disabled={editando}>
-        <SelectTrigger id="cadastrar-como" className="w-full">
-          <SelectValue placeholder="Selecione" />
-        </SelectTrigger>
-        <SelectContent>
-          {TIPOS_CADASTRO.map((t) => (
-            <SelectItem key={t.value} value={t.value}>
-              {t.label}
-            </SelectItem>
+  function handleBuscarDocumentoFiscal(tipo: "OS" | "NF", valor: string) {
+    if (!valor.trim()) {
+      toast.warning("Digite algo para buscar.");
+      return;
+    }
+    toast.info(
+      `Busca por ${tipo} ainda não disponível`,
+      `A API ainda não permite localizar um cadastro pelo número da ${tipo}.`
+    );
+  }
+
+  // A seleção é uma Pessoa, então vale para todas as abas; só a lista de
+  // resultados é refeita com o papel da nova aba.
+  function handleTrocarAba(value: string) {
+    const novaAba = value as Aba;
+    setAba(novaAba);
+    if (busca) executarBusca(busca, 1, novaAba);
+  }
+
+  function handleSelecionar(row: Person) {
+    setSelecionado(row);
+    setMostrarResultados(false);
+  }
+
+  const colunasResultado: Column<Person>[] = [
+    {
+      header: "",
+      className: "w-12",
+      cell: (row) => {
+        const edicao = linkEdicao(row, aba);
+        return edicao ? (
+          <Button size="xs" variant="ghost" asChild>
+            <Link href={edicao} aria-label={`Editar cadastro de ${row.name}`} title="Editar cadastro">
+              <Settings className="size-3.5" />
+            </Link>
+          </Button>
+        ) : null;
+      },
+    },
+    { header: "Código", accessor: "code", className: "w-24" },
+    {
+      header: "Nome",
+      cell: (row) => (
+        <div>
+          <p>{row.name}</p>
+          {row.tradeName && <p className="text-xs text-muted-foreground">{row.tradeName}</p>}
+        </div>
+      ),
+    },
+    { header: "CPF / CNPJ", cell: (row) => row.document || "—" },
+    { header: "Whatsapp", cell: (row) => row.whatsapp || "—" },
+    {
+      header: "Papéis",
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.roles.map((role) => (
+            <Badge key={role} variant="muted">
+              {PAPEL_LABEL[role]}
+            </Badge>
           ))}
-        </SelectContent>
-      </Select>
-    </Campo>
-  );
+        </div>
+      ),
+    },
+    {
+      header: "",
+      className: "w-28 text-right",
+      cell: (row) => (
+        <Button size="xs" variant="outline" onClick={() => handleSelecionar(row)}>
+          Selecionar
+        </Button>
+      ),
+    },
+  ];
 
-  const botoes = (
-    <div className="flex flex-wrap gap-2">
-      <Button size="sm" onClick={handleIncluir}>
-        Incluir
-      </Button>
-      {abaDaFicha ? (
-        <Button size="sm" variant="secondary" asChild>
-          <Link href={`/cadastro/ficha?aba=${abaDaFicha}`}>Alterar</Link>
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => toast.info("Alteração de representante ainda não disponível", "A API ainda não tem este tipo de cadastro.")}
-        >
-          Alterar
-        </Button>
-      )}
-      <Button size="sm" onClick={handleSave} disabled={salvando || carregamento.status !== "ok"}>
-        {salvando ? "Gravando..." : "Gravar"}
-      </Button>
-      <Button size="sm" variant="outline" asChild>
-        <Link href="/">Cancelar</Link>
-      </Button>
-    </div>
-  );
+  const campoBuscado = busca && CAMPOS_BUSCA.find((c) => c.key === busca.campo)!;
+  const edicaoSelecionado = selecionado && linkEdicao(selecionado, aba);
 
   return (
     <div className="px-[4.2vw] py-8 space-y-6">
-      <Breadcrumb items={[{ label: "ERP", href: "/" }, { label: "Cadastro" }]} />
+      <h1 className="text-2xl font-bold tracking-tight">Cadastro (pessoa física e jurídica)</h1>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Cadastro</h1>
-        {editando && (
-          <Badge variant="muted">
-            Alterando {rotuloTipo.toLowerCase()} nº {id}
-          </Badge>
-        )}
-      </div>
-
-      {carregamento.status === "erro" ? (
-        <EmptyState
-          icon={AlertCircle}
-          title={`Não foi possível carregar o ${rotuloTipo.toLowerCase()}`}
-          description={carregamento.mensagem}
-          action={{
-            label: "Tentar novamente",
-            onClick: () => {
-              setCarregamento({ status: "carregando" });
-              setTentativa((t) => t + 1);
-            },
-          }}
-          className="rounded-lg border border-border py-12"
-        />
-      ) : carregamento.status === "carregando" ? (
-        <div className="space-y-4" aria-busy="true">
-          <Skeleton className="h-9 w-80" />
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-40 w-full" />
+      <Card className="px-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {CAMPOS_BUSCA.map((campo) => (
+            <form
+              key={campo.key}
+              className="space-y-1.5"
+              onSubmit={(e: FormEvent) => {
+                e.preventDefault();
+                handleBuscar(campo.key);
+              }}
+            >
+              <label htmlFor={`busca-${campo.key}`} className="text-sm font-medium">
+                {campo.label}
+              </label>
+              <div className="relative">
+                <Input
+                  id={`busca-${campo.key}`}
+                  placeholder={campo.placeholder}
+                  value={campos[campo.key]}
+                  onChange={(e) => setCampos((prev) => ({ ...prev, [campo.key]: e.target.value }))}
+                  className="pr-9"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  aria-label={`Buscar por ${campo.label}`}
+                  className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  <Search className="size-4" />
+                </button>
+              </div>
+            </form>
+          ))}
         </div>
-      ) : (
-        <div className="w-full space-y-8">
-          {botoes}
 
-          <Card className="px-6">
-            <FormSection title="Cadastro rápido" description="Dados básicos de identificação.">
-              {tipoCadastro === "cliente" ? (
-                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={id} seletorTipo={seletorTipo} />
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap gap-4">
+            {(
+              [
+                { tipo: "OS", value: os, setValue: setOs },
+                { tipo: "NF", value: nf, setValue: setNf },
+              ] as const
+            ).map(({ tipo, value, setValue }) => (
+              <form
+                key={tipo}
+                className="w-40 space-y-1.5"
+                onSubmit={(e: FormEvent) => {
+                  e.preventDefault();
+                  handleBuscarDocumentoFiscal(tipo, value);
+                }}
+              >
+                <label htmlFor={`busca-${tipo}`} className="text-sm font-medium">
+                  {tipo}
+                </label>
+                <Input
+                  id={`busca-${tipo}`}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                />
+              </form>
+            ))}
+          </div>
+
+          {abaAtual.tipoCadastro ? (
+            <Button size="sm" asChild>
+              <Link href={`/cadastro/novo?tipo=${abaAtual.tipoCadastro}`}>
+                <Plus className="size-3.5" />
+                Incluir novo
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() =>
+                toast.info(
+                  `Cadastro de ${abaAtual.label.toLowerCase()} ainda não disponível`,
+                  "O formulário deste papel ainda não foi implementado."
+                )
+              }
+            >
+              <Plus className="size-3.5" />
+              Incluir novo
+            </Button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-4 border-t border-border pt-6">
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label="Mostrar resultados da busca"
+            aria-pressed={mostrarResultados}
+            disabled={busca === null}
+            onClick={() => setMostrarResultados((v) => !v)}
+          >
+            <List className="size-4" />
+          </Button>
+          <div className="w-28 space-y-1.5">
+            <label htmlFor="selecionado-codigo" className="text-sm font-medium">Código</label>
+            <Input id="selecionado-codigo" value={selecionado ? String(selecionado.code) : ""} readOnly placeholder="—" />
+          </div>
+          <div className="min-w-48 flex-1 space-y-1.5">
+            <label htmlFor="selecionado-nome" className="text-sm font-medium">Nome</label>
+            <Input id="selecionado-nome" value={selecionado?.name ?? ""} readOnly placeholder="Nenhum cadastro selecionado" />
+          </div>
+          <div className="w-52 space-y-1.5">
+            <label htmlFor="selecionado-documento" className="text-sm font-medium">CPF / CNPJ</label>
+            <Input id="selecionado-documento" value={selecionado?.document ?? ""} readOnly placeholder="—" />
+          </div>
+          {edicaoSelecionado && (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={edicaoSelecionado}>
+                <Settings className="size-3.5" />
+                Editar cadastro
+              </Link>
+            </Button>
+          )}
+        </div>
+
+        {busca !== null && campoBuscado && mostrarResultados && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {abaAtual.role
+                ? `Pessoas com papel ${abaAtual.label.toLowerCase()}`
+                : "Todas as pessoas"}{" "}
+              — {campoBuscado.label}: “{busca.termo}”
+            </p>
+            {erroBusca ? (
+              <EmptyState
+                icon={AlertCircle}
+                title="Não foi possível buscar"
+                description={erroBusca}
+                action={{ label: "Tentar novamente", onClick: () => executarBusca(busca, page) }}
+                className="rounded-lg border border-border py-12"
+              />
+            ) : (
+              <DataTable
+                data={resultados}
+                columns={colunasResultado}
+                keyExtractor={(row) => row.id}
+                isLoading={loading}
+                emptyTitle="Nenhum cadastro encontrado"
+                emptyDescription="Tente outro termo, outra aba ou use “Incluir novo”."
+              />
+            )}
+            {!erroBusca && totalPages > 1 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={(p) => executarBusca(busca, p)}
+              />
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Tabs defaultValue="cliente" value={aba} onValueChange={handleTrocarAba}>
+        <TabsList className="w-full flex-wrap justify-start">
+          {ABAS.map((a) => (
+            <TabsTrigger key={a.value} value={a.value} className="uppercase">
+              {a.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {ABAS.map((a) => (
+          <TabsContent key={a.value} value={a.value}>
+            <Card className="px-6">
+              {!selecionado ? (
+                <EmptyState
+                  icon={Search}
+                  title="Nenhum cadastro selecionado"
+                  description="Busque pelo nome, código, CPF/CNPJ ou Whatsapp e selecione um resultado."
+                />
+              ) : a.role && !selecionado.roleFlags[a.role] ? (
+                <EmptyState
+                  title={`${selecionado.name} não tem cadastro de ${a.label.toLowerCase()}`}
+                  description="Esta pessoa não possui este papel no cadastro."
+                />
+              ) : a.value === "cliente" ? (
+                <FichaCliente cliente={selecionado} />
+              ) : a.value === "fornecedor" ? (
+                selecionado.supplierId !== null ? (
+                  <FichaFornecedor key={selecionado.supplierId} supplierId={selecionado.supplierId} />
+                ) : (
+                  <EmptyState
+                    icon={AlertCircle}
+                    title="Cadastro de fornecedor não encontrado"
+                    description="A pessoa tem o papel fornecedor, mas a API não informou o código do fornecedor."
+                  />
+                )
+              ) : a.value === "financeiro" ? (
+                <AbaFinanceiro nome={selecionado.name} />
               ) : (
-                <PessoaRapido
-                  form={pessoa}
-                  atualizar={atualizarPessoa}
-                  codigo={id}
-                  camposFiscais={tipoCadastro === "fornecedor"}
-                  seletorTipo={seletorTipo}
+                <EmptyState
+                  title="Em construção"
+                  description={`Os detalhes da aba ${a.label.toLowerCase()} ainda não foram implementados.`}
                 />
               )}
-            </FormSection>
-          </Card>
-
-          {tipoCadastro === "cliente" && <ClienteCompleto form={cliente} atualizar={atualizarCliente} />}
-
-          {tipoCadastro === "cliente" && (
-            <EnderecoCampos
-              endereco={cliente.endereco}
-              onChange={(endereco) => atualizarCliente({ endereco })}
-              descricao="Endereço do cliente."
-            />
-          )}
-          {tipoCadastro === "fornecedor" && (
-            <EnderecoCampos
-              endereco={pessoa.endereco}
-              onChange={(endereco) => atualizarPessoa({ endereco })}
-              descricao="Endereço comercial do fornecedor."
-            />
-          )}
-
-          <Card className="px-6">
-            <FormSection title="Tipo de cadastro" description="Classificação do cadastro no sistema.">
-              <div className="grid gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Cadastro:</p>
-                  <RadioGroup
-                    name="tipoCadastro"
-                    value={tipoCadastro}
-                    onValueChange={(v) => {
-                      if (!editando) setTipoCadastro(v as TipoCadastro);
-                    }}
-                    className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
-                  >
-                    {TIPOS_CADASTRO.map((t) => (
-                      <RadioGroupItem
-                        key={t.value}
-                        id={`tipo-${t.value}`}
-                        value={t.value}
-                        label={t.label}
-                        disabled={editando && t.value !== tipoCadastro}
-                      />
-                    ))}
-                  </RadioGroup>
-                  {editando && (
-                    <p className="text-xs text-muted-foreground">O tipo não muda ao alterar um cadastro existente.</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Cadastro especial:</p>
-                  <RadioGroup
-                    name="cadastroEspecial"
-                    value={cadastroEspecial}
-                    onValueChange={setCadastroEspecial}
-                    className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
-                  >
-                    <RadioGroupItem id="especial-loja" value="loja" label="Loja" />
-                    <RadioGroupItem id="especial-usuario" value="usuario" label="Usuário" />
-                    <RadioGroupItem id="especial-usuario-pagador" value="usuario-pagador" label="Usuário Pagador" />
-                    <RadioGroupItem id="especial-banco" value="banco" label="Banco" />
-                  </RadioGroup>
-                </div>
-              </div>
-            </FormSection>
-          </Card>
-
-          {tipoCadastro === "fornecedor" && (
-            <FornecedorCompleto form={pessoa} atualizar={atualizarPessoa} editando={editando} />
-          )}
-
-          {tipoCadastro === "funcionario" && <FuncionarioSecoes />}
-
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button variant="outline" asChild>
-              <Link href="/">Cancelar</Link>
-            </Button>
-            <Button onClick={handleSave} disabled={salvando}>
-              {salvando ? "Gravando..." : "Gravar"}
-            </Button>
-          </div>
-        </div>
-      )}
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 }

@@ -66,7 +66,20 @@ export interface FornecedorForm {
   consumo: BlocoProdutosForm;
   revenda: BlocoProdutosForm;
   emails: EmailFornecedorForm[];
-  preservado: Pick<SupplierWrite, "email" | "contact" | "category" | "laboratories">;
+  /** "Enviar arquivo para laboratório": slots 1 a 10, na ordem */
+  laboratorios: LaboratorioForm[];
+  preservado: Pick<SupplierWrite, "email" | "contact" | "category">;
+}
+
+export interface LaboratorioForm {
+  ativo: boolean;
+  nome: string;
+}
+
+export const TOTAL_LABORATORIOS = 10;
+
+function laboratoriosVazios(): LaboratorioForm[] {
+  return Array.from({ length: TOTAL_LABORATORIOS }, () => ({ ativo: false, nome: "" }));
 }
 
 function blocoVazio(): BlocoProdutosForm {
@@ -107,6 +120,7 @@ export function fornecedorVazio(): FornecedorForm {
     consumo: blocoVazio(),
     revenda: blocoVazio(),
     emails: [],
+    laboratorios: laboratoriosVazios(),
     preservado: {},
   };
 }
@@ -168,11 +182,14 @@ export function fornecedorParaForm(s: Supplier): FornecedorForm {
       setor: e.sector ?? "",
       email: e.email,
     })),
+    laboratorios: laboratoriosVazios().map((vazio, i) => {
+      const lab = s.laboratories?.find((l) => l.slot === i + 1);
+      return lab ? { ativo: lab.active, nome: lab.name ?? "" } : vazio;
+    }),
     preservado: semVazios({
       email: s.email ?? undefined,
       contact: s.contact ?? undefined,
       category: s.category ?? undefined,
-      laboratories: s.laboratories?.map(({ slot, active, name }) => ({ slot, active, name })),
     }),
   };
 }
@@ -237,6 +254,12 @@ export function formParaFornecedorWrite(f: FornecedorForm, modo: Modo = "criar")
     allowedUserIds: f.usuariosPermitidos.map((u) => u.id),
   };
   if (card) write.card = card;
+
+  // Ao editar, os 10 slots vão sempre (o apagado volta vazio); ao criar, só os preenchidos.
+  const laboratories = f.laboratorios
+    .map((l, i) => ({ slot: i + 1, active: l.ativo, name: l.nome.trim() || null }))
+    .filter((l) => modo === "editar" || l.active || l.name !== null);
+  if (laboratories.length > 0) write.laboratories = laboratories;
   return write;
 }
 
