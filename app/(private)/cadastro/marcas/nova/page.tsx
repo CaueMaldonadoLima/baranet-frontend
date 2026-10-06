@@ -4,7 +4,6 @@ import { use, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
-import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shared/tabs";
 import { useToast } from "@/components/shared/toast";
 import { Card } from "@/components/ui/card";
@@ -32,7 +31,7 @@ export default function NovaMarcaPage({
   // Volta para quem abriu (a aba Marcas da ficha); aberta direto, vai para a ficha.
   function voltar() {
     if (window.history.length > 1) router.back();
-    else router.push("/cadastro/ficha");
+    else router.push("/cadastro");
   }
 
   const [nome, setNome] = useState("");
@@ -95,15 +94,6 @@ export default function NovaMarcaPage({
 
   return (
     <div className="px-[4.2vw] py-8 space-y-6">
-      <Breadcrumb
-        items={[
-          { label: "ERP", href: "/" },
-          { label: "Cadastro", href: "/cadastro" },
-          { label: "Ficha", href: "/cadastro/ficha" },
-          { label: "Nova marca" },
-        ]}
-      />
-
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Cadastrar marca</h1>
         <div className="flex gap-2">

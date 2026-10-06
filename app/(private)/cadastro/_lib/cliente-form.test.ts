@@ -126,7 +126,7 @@ describe("formParaClienteWrite ao editar", () => {
     expect(write.allowWithoutDocument).toBe(true);
   });
 
-  it("devolve os campos que o formulário não mostra (DDD, telefone, e-mail, redes sociais)", () => {
+  it("devolve os campos que o formulário não mostra (DDD, telefone, e-mail)", () => {
     const write = formParaClienteWrite(
       clienteParaForm({
         ...customerCompleto,
@@ -134,7 +134,6 @@ describe("formParaClienteWrite ao editar", () => {
         phone: "3333-0000",
         email: "maria@x.com",
         personType: "fisica",
-        socialNetworks: { instagram: "@maria", facebook: null },
       }),
       "editar"
     );
@@ -143,7 +142,22 @@ describe("formParaClienteWrite ao editar", () => {
       phone: "3333-0000",
       email: "maria@x.com",
       personType: "fisica",
-      socialNetworks: { instagram: "@maria" },
     });
+  });
+
+  it("carrega e grava as redes sociais; ao editar, a rede apagada vai como null", () => {
+    const form = clienteParaForm({ ...customerCompleto, socialNetworks: { instagram: "@maria", facebook: null } });
+    expect(form.redesSociais).toMatchObject({ instagram: "@maria", facebook: "" });
+
+    const write = formParaClienteWrite({ ...form, redesSociais: { ...form.redesSociais, instagram: "", tiktok: " @mari " } }, "editar");
+    expect(write.socialNetworks).toEqual({ facebook: null, instagram: null, youtube: null, twitter: null, tiktok: "@mari" });
+  });
+
+  it("ao criar, só envia as redes sociais preenchidas", () => {
+    const vazio = formParaClienteWrite({ ...clienteVazio(), nome: "Ana" });
+    expect(vazio.socialNetworks).toBeUndefined();
+
+    const write = formParaClienteWrite({ ...clienteVazio(), nome: "Ana", redesSociais: { ...clienteVazio().redesSociais, youtube: "anacanal" } });
+    expect(write.socialNetworks).toEqual({ youtube: "anacanal" });
   });
 });

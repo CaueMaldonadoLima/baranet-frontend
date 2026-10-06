@@ -13,11 +13,12 @@ import {
 import type { EnderecoForm } from "../_lib/comum";
 import { Campo } from "./campo";
 
+// Logradouro ocupa duas colunas no desktop para a última linha fechar a grade.
 const CAMPOS_TEXTO = [
   { key: "bairro", label: "Bairro", placeholder: "Bairro" },
   { key: "pais", label: "País", placeholder: "Brasil" },
   { key: "cidade", label: "Cidade", placeholder: "Cidade" },
-  { key: "logradouro", label: "Logradouro", placeholder: "Rua, avenida..." },
+  { key: "logradouro", label: "Logradouro", placeholder: "Rua, avenida...", className: "xl:col-span-2" },
   { key: "numero", label: "Número", placeholder: "Número" },
   { key: "complemento", label: "Complemento", placeholder: "Complemento" },
 ] as const;
@@ -25,11 +26,9 @@ const CAMPOS_TEXTO = [
 export function EnderecoCampos({
   endereco,
   onChange,
-  descricao,
 }: {
   endereco: EnderecoForm;
   onChange: (endereco: EnderecoForm) => void;
-  descricao: string;
 }) {
   function set<K extends keyof EnderecoForm>(key: K, value: EnderecoForm[K]) {
     onChange({ ...endereco, [key]: value });
@@ -37,7 +36,7 @@ export function EnderecoCampos({
 
   return (
     <Card className="px-6">
-      <FormSection title="Endereço" description={descricao}>
+      <FormSection title="Endereço">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <Campo id="endereco-cep" label="CEP">
             <Input
@@ -70,7 +69,7 @@ export function EnderecoCampos({
             </Select>
           </Campo>
           {CAMPOS_TEXTO.map((c) => (
-            <Campo key={c.key} id={`endereco-${c.key}`} label={c.label}>
+            <Campo key={c.key} id={`endereco-${c.key}`} label={c.label} className={"className" in c ? c.className : undefined}>
               <Input
                 id={`endereco-${c.key}`}
                 placeholder={c.placeholder}
