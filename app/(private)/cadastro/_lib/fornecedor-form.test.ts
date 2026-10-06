@@ -203,14 +203,13 @@ describe("formParaFornecedorWrite ao editar", () => {
     expect(write.address?.complement).toBeNull();
   });
 
-  it("devolve os campos que o formulário não mostra (e-mail, contato, categoria, laboratórios)", () => {
+  it("devolve os campos que o formulário não mostra (e-mail, contato, categoria)", () => {
     const write = formParaFornecedorWrite(
       fornecedorParaForm({
         ...supplierCompleto,
         email: "contato@ls.com.br",
         contact: "João",
         category: "Lentes",
-        laboratories: [{ id: 9, slot: 1, active: true, name: "Lab A" }],
       }),
       "editar"
     );
@@ -218,8 +217,29 @@ describe("formParaFornecedorWrite ao editar", () => {
       email: "contato@ls.com.br",
       contact: "João",
       category: "Lentes",
-      laboratories: [{ slot: 1, active: true, name: "Lab A" }],
     });
+  });
+
+  it("carrega os 10 laboratórios pelo slot e, ao editar, envia todos", () => {
+    const form = fornecedorParaForm({
+      ...supplierCompleto,
+      laboratories: [{ id: 9, slot: 3, active: true, name: "Lab A" }],
+    });
+    expect(form.laboratorios).toHaveLength(10);
+    expect(form.laboratorios[2]).toEqual({ ativo: true, nome: "Lab A" });
+    expect(form.laboratorios[0]).toEqual({ ativo: false, nome: "" });
+
+    const write = formParaFornecedorWrite(form, "editar");
+    expect(write.laboratories).toHaveLength(10);
+    expect(write.laboratories?.[2]).toEqual({ slot: 3, active: true, name: "Lab A" });
+    expect(write.laboratories?.[0]).toEqual({ slot: 1, active: false, name: null });
+  });
+
+  it("ao criar, só envia os laboratórios preenchidos", () => {
+    const laboratorios = fornecedorVazio().laboratorios.map((l, i) => (i === 4 ? { ativo: false, nome: " Lab B " } : l));
+    const write = formParaFornecedorWrite({ ...fornecedorVazio(), nomeFantasia: "X", laboratorios }, "criar");
+    expect(write.laboratories).toEqual([{ slot: 5, active: false, name: "Lab B" }]);
+    expect(formParaFornecedorWrite({ ...fornecedorVazio(), nomeFantasia: "X" }, "criar")).not.toHaveProperty("laboratories");
   });
 
   it("ao criar, continua omitindo o que está vazio", () => {

@@ -126,7 +126,7 @@ export function FichaFornecedor({ supplierId }: { supplierId: number }) {
       className: "w-12",
       cell: (row) => (
         <Button size="xs" variant="ghost" asChild>
-          <Link href={`/cadastro?tipo=fornecedor&id=${row.id}`} aria-label="Editar cadastro do fornecedor" title="Editar cadastro">
+          <Link href={`/cadastro/fornecedor/${row.id}`} aria-label="Editar cadastro do fornecedor" title="Editar cadastro">
             <Settings className="size-3.5" />
           </Link>
         </Button>

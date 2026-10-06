@@ -108,10 +108,7 @@ export function FuncionarioSecoes() {
   return (
     <>
       <Card className="px-6">
-      <FormSection
-        title="Acesso"
-        description="Identificação do usuário para login e fila de atendimento."
-      >
+      <FormSection title="Acesso">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Apelido de usuário</label>
@@ -132,7 +129,7 @@ export function FuncionarioSecoes() {
       </Card>
 
       <Card className="px-6">
-      <FormSection title="Senha" description="Política de senha do usuário.">
+      <FormSection title="Senha">
         <label className="flex items-center gap-2.5 cursor-pointer">
           <Checkbox
             checked={senhaManual}
@@ -386,10 +383,7 @@ export function FuncionarioSecoes() {
       </Card>
 
       <Card className="px-6">
-        <FormSection
-          title="Dados de admissão"
-          description="Informações de admissão, cargo e salário do funcionário."
-        >
+        <FormSection title="Dados de admissão">
           <label className="flex items-center gap-2.5 cursor-pointer">
             <Checkbox
               checked={usuarioFuncionario}
@@ -483,10 +477,7 @@ export function FuncionarioSecoes() {
       </Card>
 
       <Card className="px-6">
-        <FormSection
-          title="Adicionais"
-          description="Adicionais de remuneração aplicados ao salário do funcionário."
-        >
+        <FormSection title="Adicionais">
           <label className="flex items-center gap-2.5 cursor-pointer">
             <Checkbox
               checked={insalubridade}
@@ -557,10 +548,7 @@ export function FuncionarioSecoes() {
       </Card>
 
       <Card className="px-6">
-        <FormSection
-          title="Benefícios"
-          description="Benefícios recorrentes pagos ao funcionário."
-        >
+        <FormSection title="Benefícios">
           <div className="space-y-3">
             <label className="flex items-center gap-2.5 cursor-pointer">
               <Checkbox
@@ -780,7 +768,7 @@ export function FuncionarioSecoes() {
       </Card>
 
       <Card className="px-6">
-        <FormSection title="Férias" description="Controle de período aquisitivo e concessão de férias.">
+        <FormSection title="Férias">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground">Período aquisitivo — de</label>
@@ -873,7 +861,7 @@ export function FuncionarioSecoes() {
       </Card>
 
       <Card className="px-6">
-        <FormSection title="13º Salário" description="Cálculo e pagamento do décimo terceiro salário.">
+        <FormSection title="13º Salário">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Data de admissão</label>

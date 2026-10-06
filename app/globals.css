@@ -20,6 +20,10 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
 
+  /* Botões: bordô, com hover laranja (accent) */
+  --color-bordo: var(--bordo);
+  --color-bordo-foreground: var(--bordo-foreground);
+
   /* Log In */
   --color-login-title: var(--login-title);
 
@@ -96,7 +100,11 @@
   --secondary: #ff5151;
   --secondary-foreground: #0f0704;
 
-  --accent: #8a65d1;
+  --bordo: #720026;
+  --bordo-foreground: #ffffff;
+
+  /* Hover de botões e itens de select */
+  --accent: #ff7f51;
   --accent-foreground: #ffffff;
 
   /* Area Colors */
@@ -170,7 +178,11 @@
   --secondary: #ff5151;
   --secondary-foreground: #0f0704;
 
-  --accent: #8a65d1;
+  --bordo: #720026;
+  --bordo-foreground: #ffffff;
+
+  /* Hover de botões e itens de select */
+  --accent: #ff7f51;
   --accent-foreground: #ffffff;
 
   --muted: #2a1f1c;

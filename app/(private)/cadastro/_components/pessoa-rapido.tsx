@@ -60,7 +60,7 @@ export function PessoaRapido({
           onChange={(e) => atualizar({ ddd: e.target.value })}
         />
       </Campo>
-      <Campo id="pessoa-telefone" label="Telefone / Whatsapp">
+      <Campo id="pessoa-telefone" label="Telefone">
         <Input
           id="pessoa-telefone"
           placeholder="(00) 00000-0000"
@@ -107,7 +107,7 @@ export function PessoaRapido({
               onChange={(e) => atualizar({ inscricaoEstadual: e.target.value })}
             />
           </Campo>
-          <Campo id="fornecedor-cfop" label="CFOP Default na entrada de estoque">
+          <Campo id="fornecedor-cfop" label="CFOP Default na entrada de estoque" className="sm:col-span-2 xl:col-span-2">
             <Input
               id="fornecedor-cfop"
               placeholder="Ex: 1102"

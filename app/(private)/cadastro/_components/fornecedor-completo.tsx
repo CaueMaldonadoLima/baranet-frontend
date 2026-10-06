@@ -21,7 +21,7 @@ import { employeesService, storesService } from "@/services/erp";
 import type { IdNome, PaginatedResponse } from "@/services/types";
 import { emailValido } from "../_lib/comum";
 import type { BlocoProdutosForm, EmailFornecedorForm, FornecedorForm } from "../_lib/fornecedor-form";
-import { TabelaRegistros } from "../ficha/_components/tabela-registros";
+import { TabelaRegistros } from "./ficha/tabela-registros";
 import { Campo } from "./campo";
 
 type Atualizar = (patch: Partial<FornecedorForm>) => void;
@@ -36,20 +36,23 @@ const SETORES_EMAIL = [
   { value: "outro", label: "Outro" },
 ];
 
-// Características que o contas a pagar pede para contas de consumo (protótipo).
+// Características que o contas a pagar pede para contas de consumo, cada uma
+// com o próprio campo ao lado (protótipo, tela 01).
 const CARACTERISTICAS_CONSUMO = [
-  "Mínimo de referência",
-  "Nº de identificação",
-  "Data de vencimento",
-  "Leitura anterior",
-  "Leitura atual",
-  "Valor medido",
-  "Unidade de medida",
-  "Tarifa por unidade",
-  "Valor total",
-  "Taxa de esgoto",
-  "Serviços",
-];
+  { key: "mes_referencia", label: "Mês de referência", tipo: "text" },
+  { key: "identificacao", label: "Nº de identificação", tipo: "text" },
+  { key: "vencimento", label: "Data de vencimento", tipo: "text" },
+  { key: "leitura_anterior", label: "Leitura anterior", tipo: "text" },
+  { key: "leitura_atual", label: "Leitura atual", tipo: "text" },
+  { key: "valor_medido", label: "Valor medido", tipo: "text" },
+  { key: "unidade", label: "Unid. de medida", tipo: "unidade" },
+  { key: "tarifa", label: "Tarifa por unid. de medida", tipo: "text" },
+  { key: "valor_total", label: "Valor total", tipo: "text" },
+  { key: "taxa_esgoto", label: "Taxa de esgoto", tipo: "text" },
+  { key: "servicos", label: "Serviços", tipo: "text" },
+] as const;
+
+const UNIDADES_MEDIDA = ["m³", "kWh", "Mbps", "GB", "Unidade"];
 
 const COLUNAS_CONTAS = [
   { key: "situacao", label: "Situação" },
@@ -160,7 +163,7 @@ function AdicionarTexto({
 // Como a entrega é identificada: cada opção tem o próprio campo (protótipo, tela 01).
 const RASTREIOS = [
   { value: "numero_pedido", label: "Nº do pedido" },
-  { value: "numero_recibo", label: "Nº do recibo" },
+  { value: "numero_rastreio", label: "Nº de Rastreio" },
   { value: "motorista", label: "Motorista" },
   { value: "solicitado_por", label: "Solicitado por" },
   { value: "custo", label: "Custo da entrega" },
@@ -185,9 +188,9 @@ function Entregas({ form, atualizar }: { form: FornecedorForm; atualizar: Atuali
 
   return (
     <Card className="px-6">
-      <FormSection title="Fornecedor de entregas" description="Aparece em entregas nas OS ou abre em contas a pagar.">
+      <FormSection title="Fornecedor de entregas">
         <Opcao checked={form.entregas} onChange={(entregas) => atualizar({ entregas })}>
-          É fornecedor de entregas
+          Fornecedor de entregas - Aparece em entregas nas OS ou Abre em contas a pagar
         </Opcao>
         {form.entregas && (
           <div className="space-y-6">
@@ -375,7 +378,7 @@ function FinanceiroEntregas({ form, atualizar }: { form: FornecedorForm; atualiz
   const fe = form.financeiroEntregas;
   return (
     <Card className="px-6">
-      <FormSection title="Financeiro do fornecedor de entregas" description="Como as entregas viram contas a pagar e quem pode usar o serviço.">
+      <FormSection title="Financeiro do fornecedor de entregas">
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-3">
             <Opcao checked={fe.contasPorPedido} onChange={(v) => atualizar({ financeiroEntregas: { ...fe, contasPorPedido: v } })}>
@@ -412,29 +415,63 @@ function FinanceiroEntregas({ form, atualizar }: { form: FornecedorForm; atualiz
 }
 
 function ContasEspeciais({ form, atualizar }: { form: FornecedorForm; atualizar: Atualizar }) {
-  const [caracteristicas, setCaracteristicas] = useState<string[]>([]);
+  // Características e valores ainda não existem na API: ficam só na tela.
+  const [caracteristicas, setCaracteristicas] = useState<Record<string, { ativo: boolean; valor: string }>>({});
+  const caracteristica = (key: string) => caracteristicas[key] ?? { ativo: false, valor: "" };
+  const setCaracteristica = (key: string, patch: Partial<{ ativo: boolean; valor: string }>) =>
+    setCaracteristicas((prev) => ({ ...prev, [key]: { ...caracteristica(key), ...patch } }));
   const cartao = form.cartao;
   return (
     <Card className="px-6">
-      <FormSection title="Contas especiais" description="Características especiais em contas a pagar.">
+      <FormSection title="Contas especiais">
         <div className="space-y-3">
           <Opcao checked={form.contasConsumo} onChange={(contasConsumo) => atualizar({ contasConsumo })}>
-            Fornecedor de água / luz / internet
+            Fornecedor de água/luz/internet: configuração de características especiais em contas a pagar
           </Opcao>
           {form.contasConsumo && (
             <div className="space-y-3 pl-6">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {CARACTERISTICAS_CONSUMO.map((c) => (
-                  <Opcao
-                    key={c}
-                    checked={caracteristicas.includes(c)}
-                    onChange={(v) =>
-                      setCaracteristicas((prev) => (v ? [...prev, c] : prev.filter((x) => x !== c)))
-                    }
-                  >
-                    {c}
-                  </Opcao>
-                ))}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {CARACTERISTICAS_CONSUMO.map((c) => {
+                  const atual = caracteristica(c.key);
+                  return (
+                    <div key={c.key} className="flex items-center gap-2">
+                      <Checkbox
+                        checked={atual.ativo}
+                        onCheckedChange={(v) => setCaracteristica(c.key, { ativo: v === true })}
+                        aria-label={c.label}
+                      />
+                      {c.tipo === "unidade" ? (
+                        <Select
+                          value={atual.valor}
+                          onValueChange={(valor) => setCaracteristica(c.key, { valor })}
+                          disabled={!atual.ativo}
+                        >
+                          <SelectTrigger aria-label={c.label} className="h-9 w-full">
+                            <SelectValue placeholder={c.label} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {UNIDADES_MEDIDA.map((u) => (
+                              <SelectItem key={u} value={u}>
+                                {u}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          aria-label={c.label}
+                          placeholder={c.label}
+                          title={c.label}
+                          type={c.tipo}
+                          className="h-9"
+                          value={atual.valor}
+                          onChange={(e) => setCaracteristica(c.key, { valor: e.target.value })}
+                          disabled={!atual.ativo}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <NaoGravado>As características ainda não são gravadas: a API só guarda que é fornecedor de consumo.</NaoGravado>
             </div>
@@ -487,7 +524,7 @@ function RegrasFiscais({ form, atualizar }: { form: FornecedorForm; atualizar: A
   const set = (patch: Partial<FornecedorForm["regras"]>) => atualizar({ regras: { ...r, ...patch } });
   return (
     <Card className="px-6">
-      <FormSection title="Regras do módulo fiscal / financeiro" description="Como as notas deste fornecedor geram financeiro.">
+      <FormSection title="Regras do módulo fiscal / financeiro">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Opcao checked={r.fechamentoFinanceiro} onChange={(v) => set({ fechamentoFinanceiro: v })}>
@@ -593,7 +630,7 @@ function BlocoProdutos({
 function Produtos({ form, atualizar }: { form: FornecedorForm; atualizar: Atualizar }) {
   return (
     <Card className="px-6">
-      <FormSection title="Produtos" description="O que este fornecedor vende para a ótica.">
+      <FormSection title="Produtos">
         <BlocoProdutos
           id="consumo"
           titulo="Produtos para consumo"
@@ -680,7 +717,7 @@ function Emails({ form, atualizar }: { form: FornecedorForm; atualizar: Atualiza
 
   return (
     <Card className="px-6">
-      <FormSection title="E-mails" description="Contatos por setor do fornecedor.">
+      <FormSection title="E-mails">
         <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_12rem_1fr_auto]">
           <Campo id="email-descricao" label="Descrição">
             <Input
@@ -743,6 +780,36 @@ function Emails({ form, atualizar }: { form: FornecedorForm; atualizar: Atualiza
   );
 }
 
+function Laboratorios({ form, atualizar }: { form: FornecedorForm; atualizar: Atualizar }) {
+  const set = (index: number, patch: Partial<FornecedorForm["laboratorios"][number]>) =>
+    atualizar({ laboratorios: form.laboratorios.map((l, i) => (i === index ? { ...l, ...patch } : l)) });
+  return (
+    <Card className="px-6">
+      <FormSection title="Enviar arquivo para laboratório">
+        <div className="grid gap-x-10 gap-y-4 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-5">
+          {form.laboratorios.map((lab, i) => (
+            <Campo key={i} id={`laboratorio-${i + 1}`} label={`Laboratório ${i + 1}`}>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={lab.ativo}
+                  onCheckedChange={(v) => set(i, { ativo: v === true })}
+                  aria-label={`Enviar arquivo para o laboratório ${i + 1}`}
+                />
+                <Input
+                  id={`laboratorio-${i + 1}`}
+                  placeholder="Nome do laboratório"
+                  value={lab.nome}
+                  onChange={(e) => set(i, { nome: e.target.value })}
+                />
+              </div>
+            </Campo>
+          ))}
+        </div>
+      </FormSection>
+    </Card>
+  );
+}
+
 // Cadastro completo do fornecedor (tela 01, parte de baixo). O que a API
 // aceita vai no mesmo Gravar do cadastro; o resto fica só na tela, avisado.
 export function FornecedorCompleto({
@@ -752,7 +819,7 @@ export function FornecedorCompleto({
 }: {
   form: FornecedorForm;
   atualizar: Atualizar;
-  /** Contas a pagar só faz sentido para um fornecedor já gravado */
+  /** Num fornecedor novo ainda não há títulos para listar */
   editando: boolean;
 }) {
   return (
@@ -763,19 +830,22 @@ export function FornecedorCompleto({
       <RegrasFiscais form={form} atualizar={atualizar} />
       <Produtos form={form} atualizar={atualizar} />
       <Emails form={form} atualizar={atualizar} />
-      {editando && (
-        <Card className="px-6">
-          <FormSection title="Contas a pagar / crédito" description="Títulos e créditos deste fornecedor.">
-            <TabelaRegistros
-              id="contas-fornecedor"
-              colunas={COLUNAS_CONTAS}
-              comAno
-              situacoes={SITUACOES_CONTAS}
-              descricaoVazia="A API ainda não expõe o contas a pagar do fornecedor."
-            />
-          </FormSection>
-        </Card>
-      )}
+      <Card className="px-6">
+        <FormSection title="Contas a pagar / crédito">
+          <TabelaRegistros
+            id="contas-fornecedor"
+            colunas={COLUNAS_CONTAS}
+            comAno
+            situacoes={SITUACOES_CONTAS}
+            descricaoVazia={
+              editando
+                ? "A API ainda não expõe o contas a pagar do fornecedor."
+                : "Os títulos aparecem depois que o fornecedor for gravado."
+            }
+          />
+        </FormSection>
+      </Card>
+      <Laboratorios form={form} atualizar={atualizar} />
     </>
   );
 }

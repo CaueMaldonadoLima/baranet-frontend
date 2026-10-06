@@ -1,4 +1,4 @@
-import type { CustomerDetail, CustomerWrite } from "@/services/types";
+import type { CustomerDetail, CustomerSocialNetworks, CustomerWrite } from "@/services/types";
 import {
   apenasDigitos,
   enderecoParaForm,
@@ -14,6 +14,16 @@ import {
 // (Customer / CustomerWrite). Foto e QR Code ainda não vão para a API: ela
 // recebe photoUrl, e não há envio de arquivo. Os campos que a API tem mas a
 // tela não mostra vêm em `preservado` e voltam intactos ao gravar.
+
+export const REDES_SOCIAIS = [
+  { key: "instagram", label: "Instagram" },
+  { key: "facebook", label: "Facebook" },
+  { key: "tiktok", label: "TikTok" },
+  { key: "youtube", label: "YouTube" },
+  { key: "twitter", label: "X (Twitter)" },
+] as const;
+
+export type RedeSocial = (typeof REDES_SOCIAIS)[number]["key"];
 
 export interface ClienteForm {
   documento: string;
@@ -39,11 +49,12 @@ export interface ClienteForm {
   apelido: string;
   pais: string;
   endereco: EnderecoForm;
+  redesSociais: Record<RedeSocial, string>;
   /** Preenchidos pelo sistema: só exibição (YYYY-MM-DD) */
   ultimaCompra: string;
   dataCadastro: string;
   atualizacao: string;
-  preservado: Pick<CustomerWrite, "personType" | "ddd" | "phone" | "email" | "photoUrl" | "socialNetworks">;
+  preservado: Pick<CustomerWrite, "personType" | "ddd" | "phone" | "email" | "photoUrl">;
 }
 
 export function clienteVazio(): ClienteForm {
@@ -70,6 +81,7 @@ export function clienteVazio(): ClienteForm {
     apelido: "",
     pais: "Brasil",
     endereco: enderecoVazio(),
+    redesSociais: { instagram: "", facebook: "", tiktok: "", youtube: "", twitter: "" },
     ultimaCompra: "",
     dataCadastro: "",
     atualizacao: "",
@@ -109,6 +121,13 @@ export function clienteParaForm(c: CustomerDetail): ClienteForm {
     apelido: c.nickname ?? "",
     pais: endereco.pais,
     endereco,
+    redesSociais: {
+      instagram: c.socialNetworks?.instagram ?? "",
+      facebook: c.socialNetworks?.facebook ?? "",
+      tiktok: c.socialNetworks?.tiktok ?? "",
+      youtube: c.socialNetworks?.youtube ?? "",
+      twitter: c.socialNetworks?.twitter ?? "",
+    },
     ultimaCompra: data(c.lastPurchase),
     dataCadastro: data(c.registeredAt),
     atualizacao: data(c.updatedAt),
@@ -118,15 +137,14 @@ export function clienteParaForm(c: CustomerDetail): ClienteForm {
       phone: c.phone ?? undefined,
       email: c.email ?? undefined,
       photoUrl: c.photoUrl ?? undefined,
-      socialNetworks: c.socialNetworks
-        ? semVazios(Object.fromEntries(Object.entries(c.socialNetworks).map(([k, v]) => [k, v ?? undefined])))
-        : undefined,
     }),
   };
 }
 
 export function formParaClienteWrite(f: ClienteForm, modo: Modo = "criar"): CustomerWrite {
   const endereco = formParaEndereco(f.endereco, modo);
+  // Ao criar, só as redes preenchidas; ao editar, a apagada vai como null.
+  const redes: CustomerSocialNetworks = limpos(modo, f.redesSociais);
   return {
     ...(modo === "editar" ? f.preservado : {}),
     ...limpos(modo, {
@@ -156,6 +174,7 @@ export function formParaClienteWrite(f: ClienteForm, modo: Modo = "criar"): Cust
     allowWithoutDocument: f.menorSemCpf,
     isForeigner: f.estrangeiro,
     address: endereco,
+    ...(Object.keys(redes).length > 0 ? { socialNetworks: redes } : {}),
   };
 }
 

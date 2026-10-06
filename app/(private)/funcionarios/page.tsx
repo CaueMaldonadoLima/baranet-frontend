@@ -73,7 +73,7 @@ export default function FuncionariosPage() {
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-foreground">Funcionários</h1>
         <Button asChild>
-          <Link href="/cadastro">
+          <Link href="/cadastro/novo?tipo=funcionario">
             <Users className="size-4" />
             Novo Funcionário
           </Link>
