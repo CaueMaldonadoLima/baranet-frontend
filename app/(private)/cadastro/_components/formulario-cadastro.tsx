@@ -110,6 +110,9 @@ function FormularioCadastro({
   );
   const [tentativa, setTentativa] = useState(0);
   const [salvando, setSalvando] = useState(false);
+  // Código exibido = id da Pessoa, o mesmo da lista. O id da URL é o do papel
+  // (cliente/fornecedor), que tem numeração própria.
+  const [codigoPessoa, setCodigoPessoa] = useState<number | null>(null);
 
   useEffect(() => {
     if (id === null) return;
@@ -117,10 +120,14 @@ function FormularioCadastro({
     const carregar =
       tipoInicial === "fornecedor"
         ? suppliersService.get(id).then((s) => {
-            if (ativo) setPessoa(fornecedorParaForm(s));
+            if (!ativo) return;
+            setPessoa(fornecedorParaForm(s));
+            setCodigoPessoa(s.personId);
           })
         : customersService.get(id).then((c) => {
-            if (ativo) setCliente(clienteParaForm(c));
+            if (!ativo) return;
+            setCliente(clienteParaForm(c));
+            setCodigoPessoa(c.personId);
           });
     carregar
       .then(() => {
@@ -238,7 +245,8 @@ function FormularioCadastro({
         <h1 className="text-2xl font-bold tracking-tight">Cadastro</h1>
         {editando && (
           <Badge variant="muted">
-            Alterando {rotuloTipo.toLowerCase()} nº {id}
+            Alterando {rotuloTipo.toLowerCase()}
+            {codigoPessoa !== null && ` nº ${codigoPessoa}`}
           </Badge>
         )}
       </div>
@@ -317,12 +325,12 @@ function FormularioCadastro({
           <Card className="px-6">
             <FormSection title="Cadastro rápido">
               {tipoCadastro === "cliente" ? (
-                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={id} seletorTipo={seletorTipo} />
+                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={codigoPessoa} seletorTipo={seletorTipo} />
               ) : (
                 <PessoaRapido
                   form={pessoa}
                   atualizar={atualizarPessoa}
-                  codigo={id}
+                  codigo={codigoPessoa}
                   camposFiscais={tipoCadastro === "fornecedor"}
                   seletorTipo={seletorTipo}
                 />
