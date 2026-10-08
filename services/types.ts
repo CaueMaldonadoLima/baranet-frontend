@@ -286,6 +286,19 @@ export interface CustomerDetail {
   rgIssuer?: string | null;
   rgState?: string | null;
   nickname?: string | null;
+  companyName?: string | null;
+  jobTitle?: string | null;
+  admissionDate?: string | null;
+  companyDdd?: string | null;
+  companyPhone?: string | null;
+  income?: number | null;
+  department1?: string | null;
+  department2?: string | null;
+  isStoreEmployee?: boolean;
+  /** Nome do convênio (texto livre na API) */
+  agreement?: string | null;
+  agreementLimit?: number | null;
+  links?: CustomerLink[];
   photoUrl?: string | null;
   socialNetworks?: CustomerSocialNetworks;
   address?: Partial<PersonAddress>;
@@ -296,6 +309,13 @@ export interface CustomerDetail {
 export type CustomerSocialNetworks = Partial<
   Record<"facebook" | "instagram" | "youtube" | "twitter" | "tiktok", string | null>
 >;
+/** Vínculo com outro cliente (ex: relation "IRMÃO"); customerId é o id do papel cliente */
+export interface CustomerLink {
+  customerId: number;
+  name?: string;
+  document?: string | null;
+  relation?: string | null;
+}
 /** POST/PUT /customers — schema CustomerWrite do Swagger (campos da tela 02) */
 export interface CustomerWrite {
   personId?: number;
@@ -326,6 +346,18 @@ export interface CustomerWrite {
   rgState?: string | null;
   nickname?: string | null;
   country?: string | null;
+  companyName?: string | null;
+  jobTitle?: string | null;
+  admissionDate?: string | null;
+  companyDdd?: string | null;
+  companyPhone?: string | null;
+  income?: number | null;
+  department1?: string | null;
+  department2?: string | null;
+  isStoreEmployee?: boolean;
+  agreement?: string | null;
+  agreementLimit?: number | null;
+  links?: { customerId: number; relation?: string | null }[];
   address?: Partial<Record<keyof PersonAddress, string | null>>;
   city?: string | null;
   state?: string | null;

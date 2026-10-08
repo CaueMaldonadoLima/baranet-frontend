@@ -16,7 +16,7 @@ _Avoid_: Registro, ficha (usados de forma intercambiável na ata, mas "Cadastro"
 **Tipo de Cadastro**:
 Classifica um Cadastro como Cliente, Fornecedor, Funcionário, Administrador ou Representante. Determina quais campos aparecem na tela de cadastro (regra ainda não implementada — hoje a tela mostra todos os campos de todos os tipos simultaneamente).
 - **Representante**: tipo já presente no seletor da tela, mas sem menção na ata e **não** é um papel de Pessoa na API (os papéis são cliente, fornecedor, funcionário, médico/optometrista e convênio). O `/representatives` da API é o Representante de marca (ver abaixo). Mantido bloqueado (toast de aviso) até virar requisito formal.
-- **Cadastro especial** (Loja / Usuário / Usuário Pagador / Banco): campo existente na tela, não mencionado na ata. Significado de negócio **pendente de esclarecimento com o cliente** — não presumir função.
+- **Cadastro especial** (Loja / Usuário / Usuário Pagador / Banco): estava no protótipo, mas não é mencionado na ata e nunca foi gravado. Vai existir, mas está **oculto na tela desde 2026-10-08** (constante `MOSTRAR_CADASTRO_ESPECIAL`) para não gerar ruído enquanto não funciona. Significado de negócio **pendente de esclarecimento com o cliente** — não presumir função.
 
 **Usuário**:
 Capacidade de autenticação (login, senha, 2FA) associada a um Cadastro. Só Funcionário e Administrador carregam essa capacidade — Cliente e Fornecedor não têm login no ERP (o cliente final de uma ótica loga no storefront via um fluxo e cookie `store_session` totalmente separados).
