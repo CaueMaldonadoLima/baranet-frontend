@@ -43,6 +43,10 @@ import {
   type FornecedorForm,
 } from "../_lib/fornecedor-form";
 
+// Cadastro especial (Loja / Usuário / Usuário Pagador / Banco) ainda não é
+// gravado: fica oculto até a regra ser definida (ver CONTEXT.md).
+const MOSTRAR_CADASTRO_ESPECIAL = false;
+
 export const TIPOS_CADASTRO = [
   { value: "cliente", label: "Cliente" },
   { value: "fornecedor", label: "Fornecedor" },
@@ -290,20 +294,22 @@ function FormularioCadastro({
                     <p className="text-xs text-muted-foreground">O tipo não muda ao alterar um cadastro existente.</p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Cadastro especial:</p>
-                  <RadioGroup
-                    name="cadastroEspecial"
-                    value={cadastroEspecial}
-                    onValueChange={setCadastroEspecial}
-                    className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
-                  >
-                    <RadioGroupItem id="especial-loja" value="loja" label="Loja" />
-                    <RadioGroupItem id="especial-usuario" value="usuario" label="Usuário" />
-                    <RadioGroupItem id="especial-usuario-pagador" value="usuario-pagador" label="Usuário Pagador" />
-                    <RadioGroupItem id="especial-banco" value="banco" label="Banco" />
-                  </RadioGroup>
-                </div>
+                {MOSTRAR_CADASTRO_ESPECIAL && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Cadastro especial:</p>
+                    <RadioGroup
+                      name="cadastroEspecial"
+                      value={cadastroEspecial}
+                      onValueChange={setCadastroEspecial}
+                      className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
+                    >
+                      <RadioGroupItem id="especial-loja" value="loja" label="Loja" />
+                      <RadioGroupItem id="especial-usuario" value="usuario" label="Usuário" />
+                      <RadioGroupItem id="especial-usuario-pagador" value="usuario-pagador" label="Usuário Pagador" />
+                      <RadioGroupItem id="especial-banco" value="banco" label="Banco" />
+                    </RadioGroup>
+                  </div>
+                )}
               </div>
             </FormSection>
           </Card>
@@ -332,8 +338,8 @@ function FormularioCadastro({
               onChange={(endereco) => atualizarCliente({ endereco })}
             />
           )}
-          {tipoCadastro === "cliente" && <ClienteDadosComerciais />}
-          {tipoCadastro === "cliente" && <ClienteVinculos />}
+          {tipoCadastro === "cliente" && <ClienteDadosComerciais form={cliente} atualizar={atualizarCliente} />}
+          {tipoCadastro === "cliente" && <ClienteVinculos form={cliente} atualizar={atualizarCliente} />}
           {tipoCadastro === "cliente" && <ClienteRedesSociais form={cliente} atualizar={atualizarCliente} />}
           {tipoCadastro === "fornecedor" && (
             <EnderecoCampos
