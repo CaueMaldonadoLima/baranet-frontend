@@ -106,6 +106,72 @@ describe("formParaClienteWrite", () => {
   });
 });
 
+describe("dados comerciais e vínculos", () => {
+  const comComercial: CustomerDetail = {
+    ...customerCompleto,
+    companyName: "Acme",
+    jobTitle: "Analista",
+    admissionDate: "2020-01-01",
+    companyDdd: "11",
+    companyPhone: "3000-0000",
+    income: 5000,
+    department1: "TI",
+    department2: "Suporte",
+    isStoreEmployee: false,
+    agreement: "Unimed",
+    agreementLimit: 1000,
+    links: [{ customerId: 42, name: "João Souza", document: "11122233344", relation: "IRMÃO" }],
+  };
+
+  it("carrega e devolve os campos no payload (ida e volta)", () => {
+    const write = formParaClienteWrite(clienteParaForm(comComercial));
+    expect(write).toMatchObject({
+      companyName: "Acme",
+      jobTitle: "Analista",
+      admissionDate: "2020-01-01",
+      companyDdd: "11",
+      companyPhone: "3000-0000",
+      income: 5000,
+      department1: "TI",
+      department2: "Suporte",
+      isStoreEmployee: false,
+      agreement: "Unimed",
+      agreementLimit: 1000,
+      links: [{ customerId: 42, relation: "IRMÃO" }],
+    });
+  });
+
+  it("converte renda e limite com vírgula decimal", () => {
+    const form = clienteVazio();
+    const write = formParaClienteWrite({
+      ...form,
+      nome: "Ana",
+      comercial: { ...form.comercial, renda: "5.000,50", limiteConvenio: "1000" },
+    });
+    expect(write.income).toBe(5000.5);
+    expect(write.agreementLimit).toBe(1000);
+  });
+
+  it("ao criar, deixa de fora o que está vazio e não manda links sem vínculo", () => {
+    const write = formParaClienteWrite({ ...clienteVazio(), nome: "Ana" });
+    expect(write).not.toHaveProperty("companyName");
+    expect(write).not.toHaveProperty("income");
+    expect(write).not.toHaveProperty("links");
+    expect(write.isStoreEmployee).toBe(false);
+  });
+
+  it("ao editar, apaga o que foi limpo e manda a lista de vínculos mesmo vazia", () => {
+    const form = clienteParaForm(comComercial);
+    const write = formParaClienteWrite(
+      { ...form, comercial: { ...form.comercial, empresa: "", renda: "" }, vinculos: [] },
+      "editar"
+    );
+    expect(write.companyName).toBeNull();
+    expect(write.income).toBeNull();
+    expect(write.links).toEqual([]);
+  });
+});
+
 describe("validarCliente", () => {
   it("exige o nome", () => {
     expect(validarCliente(clienteVazio())).toBe("Informe o nome do cliente.");

@@ -5,7 +5,9 @@ import {
   enderecoVazio,
   formParaEndereco,
   limpos,
+  numeroNoModo,
   semVazios,
+  textoDeNumero,
   type EnderecoForm,
   type Modo,
 } from "./comum";
@@ -24,6 +26,40 @@ export const REDES_SOCIAIS = [
 ] as const;
 
 export type RedeSocial = (typeof REDES_SOCIAIS)[number]["key"];
+
+/** O value é o que a API guarda em `relation` (ex: IRMÃO) */
+export const PARENTESCOS = [
+  { value: "IRMÃO", label: "Irmão(ã)" },
+  { value: "PAI", label: "Pai" },
+  { value: "MÃE", label: "Mãe" },
+  { value: "FILHO", label: "Filho(a)" },
+  { value: "CÔNJUGE", label: "Cônjuge" },
+  { value: "RESPONSÁVEL", label: "Responsável" },
+  { value: "OUTRO", label: "Outro" },
+];
+
+export interface DadosComerciaisForm {
+  empresa: string;
+  cargo: string;
+  admissao: string;
+  ddd: string;
+  telefone: string;
+  renda: string;
+  departamento1: string;
+  departamento2: string;
+  funcionarioLoja: boolean;
+  /** Nome do convênio: a API guarda texto, não o id */
+  convenio: string;
+  limiteConvenio: string;
+}
+
+export interface Vinculo {
+  /** Id do papel cliente da pessoa vinculada */
+  customerId: number;
+  nome: string;
+  documento: string;
+  parentesco: string;
+}
 
 export interface ClienteForm {
   documento: string;
@@ -49,6 +85,8 @@ export interface ClienteForm {
   apelido: string;
   pais: string;
   endereco: EnderecoForm;
+  comercial: DadosComerciaisForm;
+  vinculos: Vinculo[];
   redesSociais: Record<RedeSocial, string>;
   /** Preenchidos pelo sistema: só exibição (YYYY-MM-DD) */
   ultimaCompra: string;
@@ -81,6 +119,20 @@ export function clienteVazio(): ClienteForm {
     apelido: "",
     pais: "Brasil",
     endereco: enderecoVazio(),
+    comercial: {
+      empresa: "",
+      cargo: "",
+      admissao: "",
+      ddd: "",
+      telefone: "",
+      renda: "",
+      departamento1: "",
+      departamento2: "",
+      funcionarioLoja: false,
+      convenio: "",
+      limiteConvenio: "",
+    },
+    vinculos: [],
     redesSociais: { instagram: "", facebook: "", tiktok: "", youtube: "", twitter: "" },
     ultimaCompra: "",
     dataCadastro: "",
@@ -121,6 +173,25 @@ export function clienteParaForm(c: CustomerDetail): ClienteForm {
     apelido: c.nickname ?? "",
     pais: endereco.pais,
     endereco,
+    comercial: {
+      empresa: c.companyName ?? "",
+      cargo: c.jobTitle ?? "",
+      admissao: data(c.admissionDate),
+      ddd: c.companyDdd ?? "",
+      telefone: c.companyPhone ?? "",
+      renda: textoDeNumero(c.income),
+      departamento1: c.department1 ?? "",
+      departamento2: c.department2 ?? "",
+      funcionarioLoja: c.isStoreEmployee ?? false,
+      convenio: c.agreement ?? "",
+      limiteConvenio: textoDeNumero(c.agreementLimit),
+    },
+    vinculos: (c.links ?? []).map((l) => ({
+      customerId: l.customerId,
+      nome: l.name ?? "",
+      documento: l.document ?? "",
+      parentesco: l.relation ?? "",
+    })),
     redesSociais: {
       instagram: c.socialNetworks?.instagram ?? "",
       facebook: c.socialNetworks?.facebook ?? "",
@@ -145,6 +216,7 @@ export function formParaClienteWrite(f: ClienteForm, modo: Modo = "criar"): Cust
   const endereco = formParaEndereco(f.endereco, modo);
   // Ao criar, só as redes preenchidas; ao editar, a apagada vai como null.
   const redes: CustomerSocialNetworks = limpos(modo, f.redesSociais);
+  const com = f.comercial;
   return {
     ...(modo === "editar" ? f.preservado : {}),
     ...limpos(modo, {
@@ -169,10 +241,25 @@ export function formParaClienteWrite(f: ClienteForm, modo: Modo = "criar"): Cust
       // Cidade/UF também no topo: é o que a listagem de clientes mostra.
       city: endereco.city,
       state: endereco.state,
+      companyName: com.empresa,
+      jobTitle: com.cargo,
+      admissionDate: com.admissao,
+      companyDdd: com.ddd,
+      companyPhone: com.telefone,
+      department1: com.departamento1,
+      department2: com.departamento2,
+      agreement: com.convenio,
+      income: numeroNoModo(modo, com.renda),
+      agreementLimit: numeroNoModo(modo, com.limiteConvenio),
     }),
     status: f.status,
     allowWithoutDocument: f.menorSemCpf,
     isForeigner: f.estrangeiro,
+    isStoreEmployee: com.funcionarioLoja,
+    // Ao editar, a lista vai sempre (vazia apaga os vínculos antigos).
+    ...(modo === "editar" || f.vinculos.length > 0
+      ? { links: f.vinculos.map((v) => ({ customerId: v.customerId, relation: v.parentesco || null })) }
+      : {}),
     address: endereco,
     ...(Object.keys(redes).length > 0 ? { socialNetworks: redes } : {}),
   };

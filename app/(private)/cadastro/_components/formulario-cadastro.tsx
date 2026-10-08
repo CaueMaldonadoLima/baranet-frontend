@@ -43,6 +43,10 @@ import {
   type FornecedorForm,
 } from "../_lib/fornecedor-form";
 
+// Cadastro especial (Loja / Usuário / Usuário Pagador / Banco) ainda não é
+// gravado: fica oculto até a regra ser definida (ver CONTEXT.md).
+const MOSTRAR_CADASTRO_ESPECIAL = false;
+
 export const TIPOS_CADASTRO = [
   { value: "cliente", label: "Cliente" },
   { value: "fornecedor", label: "Fornecedor" },
@@ -106,6 +110,9 @@ function FormularioCadastro({
   );
   const [tentativa, setTentativa] = useState(0);
   const [salvando, setSalvando] = useState(false);
+  // Código exibido = id da Pessoa, o mesmo da lista. O id da URL é o do papel
+  // (cliente/fornecedor), que tem numeração própria.
+  const [codigoPessoa, setCodigoPessoa] = useState<number | null>(null);
 
   useEffect(() => {
     if (id === null) return;
@@ -113,10 +120,14 @@ function FormularioCadastro({
     const carregar =
       tipoInicial === "fornecedor"
         ? suppliersService.get(id).then((s) => {
-            if (ativo) setPessoa(fornecedorParaForm(s));
+            if (!ativo) return;
+            setPessoa(fornecedorParaForm(s));
+            setCodigoPessoa(s.personId);
           })
         : customersService.get(id).then((c) => {
-            if (ativo) setCliente(clienteParaForm(c));
+            if (!ativo) return;
+            setCliente(clienteParaForm(c));
+            setCodigoPessoa(c.personId);
           });
     carregar
       .then(() => {
@@ -234,7 +245,8 @@ function FormularioCadastro({
         <h1 className="text-2xl font-bold tracking-tight">Cadastro</h1>
         {editando && (
           <Badge variant="muted">
-            Alterando {rotuloTipo.toLowerCase()} nº {id}
+            Alterando {rotuloTipo.toLowerCase()}
+            {codigoPessoa !== null && ` nº ${codigoPessoa}`}
           </Badge>
         )}
       </div>
@@ -290,20 +302,22 @@ function FormularioCadastro({
                     <p className="text-xs text-muted-foreground">O tipo não muda ao alterar um cadastro existente.</p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Cadastro especial:</p>
-                  <RadioGroup
-                    name="cadastroEspecial"
-                    value={cadastroEspecial}
-                    onValueChange={setCadastroEspecial}
-                    className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
-                  >
-                    <RadioGroupItem id="especial-loja" value="loja" label="Loja" />
-                    <RadioGroupItem id="especial-usuario" value="usuario" label="Usuário" />
-                    <RadioGroupItem id="especial-usuario-pagador" value="usuario-pagador" label="Usuário Pagador" />
-                    <RadioGroupItem id="especial-banco" value="banco" label="Banco" />
-                  </RadioGroup>
-                </div>
+                {MOSTRAR_CADASTRO_ESPECIAL && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Cadastro especial:</p>
+                    <RadioGroup
+                      name="cadastroEspecial"
+                      value={cadastroEspecial}
+                      onValueChange={setCadastroEspecial}
+                      className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
+                    >
+                      <RadioGroupItem id="especial-loja" value="loja" label="Loja" />
+                      <RadioGroupItem id="especial-usuario" value="usuario" label="Usuário" />
+                      <RadioGroupItem id="especial-usuario-pagador" value="usuario-pagador" label="Usuário Pagador" />
+                      <RadioGroupItem id="especial-banco" value="banco" label="Banco" />
+                    </RadioGroup>
+                  </div>
+                )}
               </div>
             </FormSection>
           </Card>
@@ -311,12 +325,12 @@ function FormularioCadastro({
           <Card className="px-6">
             <FormSection title="Cadastro rápido">
               {tipoCadastro === "cliente" ? (
-                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={id} seletorTipo={seletorTipo} />
+                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={codigoPessoa} seletorTipo={seletorTipo} />
               ) : (
                 <PessoaRapido
                   form={pessoa}
                   atualizar={atualizarPessoa}
-                  codigo={id}
+                  codigo={codigoPessoa}
                   camposFiscais={tipoCadastro === "fornecedor"}
                   seletorTipo={seletorTipo}
                 />
@@ -332,8 +346,8 @@ function FormularioCadastro({
               onChange={(endereco) => atualizarCliente({ endereco })}
             />
           )}
-          {tipoCadastro === "cliente" && <ClienteDadosComerciais />}
-          {tipoCadastro === "cliente" && <ClienteVinculos />}
+          {tipoCadastro === "cliente" && <ClienteDadosComerciais form={cliente} atualizar={atualizarCliente} />}
+          {tipoCadastro === "cliente" && <ClienteVinculos form={cliente} atualizar={atualizarCliente} />}
           {tipoCadastro === "cliente" && <ClienteRedesSociais form={cliente} atualizar={atualizarCliente} />}
           {tipoCadastro === "fornecedor" && (
             <EnderecoCampos

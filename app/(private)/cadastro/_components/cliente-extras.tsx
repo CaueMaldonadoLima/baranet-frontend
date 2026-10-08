@@ -18,32 +18,24 @@ import {
 } from "@/components/ui/select";
 import { peopleService } from "@/services/erp";
 import { mensagemDeErro, type Person } from "@/services/types";
+import { PARENTESCOS, type ClienteForm, type DadosComerciaisForm, type Vinculo } from "../_lib/cliente-form";
 import { Campo } from "./campo";
 
-// Dados comerciais e vínculos do cliente (tela 02, parte de baixo). A API de
-// clientes ainda não tem esses campos: ficam só na tela, avisado.
-
-function NaoGravado({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs text-muted-foreground">{children}</p>;
-}
+// Dados comerciais e vínculos do cliente (tela 02, parte de baixo).
 
 type Convenios = { status: "carregando" } | { status: "erro" } | { status: "ok"; lista: Person[] };
 
-export function ClienteDadosComerciais() {
-  const [dados, setDados] = useState({
-    empresa: "",
-    cargo: "",
-    admissao: "",
-    ddd: "",
-    telefone: "",
-    renda: "",
-    departamento1: "",
-    departamento2: "",
-    funcionarioLoja: false,
-    convenio: "",
-    limiteConvenio: "",
-  });
-  const set = (patch: Partial<typeof dados>) => setDados((prev) => ({ ...prev, ...patch }));
+const nomeDoConvenio = (p: Person) => p.tradeName || p.name;
+
+export function ClienteDadosComerciais({
+  form,
+  atualizar,
+}: {
+  form: ClienteForm;
+  atualizar: (patch: Partial<ClienteForm>) => void;
+}) {
+  const dados = form.comercial;
+  const set = (patch: Partial<DadosComerciaisForm>) => atualizar({ comercial: { ...dados, ...patch } });
 
   // Convênio é um papel de Pessoa (ver CONTEXT.md).
   const [convenios, setConvenios] = useState<Convenios>({ status: "carregando" });
@@ -61,6 +53,11 @@ export function ClienteDadosComerciais() {
       ativo = false;
     };
   }, []);
+
+  // A API guarda o nome do convênio, não o id: um nome gravado que não está na
+  // lista (ex: convênio renomeado) continua aparecendo como opção.
+  const opcoesConvenio = convenios.status === "ok" ? convenios.lista.map(nomeDoConvenio) : [];
+  if (dados.convenio && !opcoesConvenio.includes(dados.convenio)) opcoesConvenio.unshift(dados.convenio);
 
   const placeholderConvenio =
     convenios.status === "carregando"
@@ -140,18 +137,17 @@ export function ClienteDadosComerciais() {
             <Select
               value={dados.convenio}
               onValueChange={(convenio) => set({ convenio })}
-              disabled={convenios.status !== "ok" || convenios.lista.length === 0}
+              disabled={opcoesConvenio.length === 0}
             >
               <SelectTrigger id="comercial-convenio" className="w-full">
                 <SelectValue placeholder={placeholderConvenio} />
               </SelectTrigger>
               <SelectContent>
-                {convenios.status === "ok" &&
-                  convenios.lista.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.tradeName || c.name}
-                    </SelectItem>
-                  ))}
+                {opcoesConvenio.map((nome) => (
+                  <SelectItem key={nome} value={nome}>
+                    {nome}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Campo>
@@ -165,44 +161,50 @@ export function ClienteDadosComerciais() {
             />
           </Campo>
         </div>
-        <NaoGravado>Os dados comerciais ainda não são gravados: a API de clientes não tem esses campos.</NaoGravado>
       </FormSection>
     </Card>
   );
 }
 
-const PARENTESCOS = [
-  { value: "irmao", label: "Irmão(ã)" },
-  { value: "pai", label: "Pai" },
-  { value: "mae", label: "Mãe" },
-  { value: "filho", label: "Filho(a)" },
-  { value: "conjuge", label: "Cônjuge" },
-  { value: "responsavel", label: "Responsável" },
-  { value: "outro", label: "Outro" },
-];
-
-interface Vinculo {
+interface NovoVinculo {
+  /** Código da grid de cadastro (id da Pessoa) */
   codigo: string;
+  /** Vem da busca pelo código: só pessoa com papel cliente pode ser vinculada */
+  customerId: number | null;
   nome: string;
   documento: string;
   parentesco: string;
 }
 
-export function ClienteVinculos() {
-  const toast = useToast();
-  const vazio: Vinculo = { codigo: "", nome: "", documento: "", parentesco: "irmao" };
-  const [novo, setNovo] = useState<Vinculo>(vazio);
-  const [vinculos, setVinculos] = useState<Vinculo[]>([]);
-  const [buscando, setBuscando] = useState(false);
+const novoVazio: NovoVinculo = { codigo: "", customerId: null, nome: "", documento: "", parentesco: PARENTESCOS[0].value };
 
-  // O código da grid é o id da Pessoa: preenche nome e documento.
+export function ClienteVinculos({
+  form,
+  atualizar,
+}: {
+  form: ClienteForm;
+  atualizar: (patch: Partial<ClienteForm>) => void;
+}) {
+  const toast = useToast();
+  const [novo, setNovo] = useState<NovoVinculo>(novoVazio);
+  const [buscando, setBuscando] = useState(false);
+  const vinculos = form.vinculos;
+  const setVinculos = (lista: Vinculo[]) => atualizar({ vinculos: lista });
+
+  // O código da grid é o id da Pessoa; a API recebe o id do papel cliente dela.
   async function buscarPorCodigo() {
     const codigo = novo.codigo.trim();
     if (!/^\d+$/.test(codigo)) return;
     setBuscando(true);
     try {
       const pessoa = await peopleService.get(Number(codigo));
-      setNovo((prev) => ({ ...prev, nome: pessoa.name, documento: pessoa.document ?? "" }));
+      if (pessoa.customerId === null) {
+        toast.warning("Este cadastro não é cliente", "Só é possível vincular pessoas com o papel cliente.");
+        setNovo((prev) => ({ ...prev, customerId: null, nome: "", documento: "" }));
+        return;
+      }
+      const customerId = pessoa.customerId;
+      setNovo((prev) => ({ ...prev, customerId, nome: pessoa.name, documento: pessoa.document ?? "" }));
     } catch (err) {
       toast.warning("Cadastro não encontrado", mensagemDeErro(err));
     } finally {
@@ -211,19 +213,23 @@ export function ClienteVinculos() {
   }
 
   function vincular() {
-    if (!novo.nome.trim()) {
-      toast.warning("Informe o cliente a vincular.");
+    const { customerId } = novo;
+    if (customerId === null) {
+      toast.warning("Informe o código do cliente a vincular.");
       return;
     }
-    setVinculos((prev) => [...prev, { ...novo, nome: novo.nome.trim() }]);
-    setNovo(vazio);
+    if (vinculos.some((v) => v.customerId === customerId)) {
+      toast.warning("Este cliente já está vinculado.");
+      return;
+    }
+    setVinculos([...vinculos, { customerId, nome: novo.nome, documento: novo.documento, parentesco: novo.parentesco }]);
+    setNovo(novoVazio);
   }
 
-  const rotuloParentesco = (v: string) => PARENTESCOS.find((p) => p.value === v)?.label ?? v;
+  const rotuloParentesco = (v: string) => (v ? (PARENTESCOS.find((p) => p.value === v)?.label ?? v) : "—");
 
   const columns: Column<Vinculo>[] = [
-    { header: "Código", cell: (row) => row.codigo || "—", className: "w-24" },
-    { header: "Nome", cell: (row) => row.nome },
+    { header: "Nome", cell: (row) => row.nome || "—" },
     { header: "CPF / CNPJ", cell: (row) => row.documento || "—" },
     { header: "Parentesco", cell: (row) => rotuloParentesco(row.parentesco) },
     {
@@ -235,7 +241,7 @@ export function ClienteVinculos() {
           size="xs"
           variant="ghost"
           aria-label={`Desvincular ${row.nome}`}
-          onClick={() => setVinculos((prev) => prev.filter((_, i) => i !== index))}
+          onClick={() => setVinculos(vinculos.filter((_, i) => i !== index))}
         >
           <Trash2 className="size-3.5" />
         </Button>
@@ -253,7 +259,7 @@ export function ClienteVinculos() {
               inputMode="numeric"
               value={novo.codigo}
               disabled={buscando}
-              onChange={(e) => setNovo({ ...novo, codigo: e.target.value })}
+              onChange={(e) => setNovo({ ...novo, codigo: e.target.value, customerId: null, nome: "", documento: "" })}
               onBlur={buscarPorCodigo}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -264,14 +270,10 @@ export function ClienteVinculos() {
             />
           </Campo>
           <Campo id="vinculo-nome" label="Nome">
-            <Input id="vinculo-nome" value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} />
+            <Input id="vinculo-nome" value={novo.nome} readOnly placeholder="Busque pelo código" />
           </Campo>
           <Campo id="vinculo-documento" label="CPF / CNPJ">
-            <Input
-              id="vinculo-documento"
-              value={novo.documento}
-              onChange={(e) => setNovo({ ...novo, documento: e.target.value })}
-            />
+            <Input id="vinculo-documento" value={novo.documento} readOnly placeholder="—" />
           </Campo>
           <Campo id="vinculo-parentesco" label="Parentesco">
             <Select value={novo.parentesco} onValueChange={(parentesco) => setNovo({ ...novo, parentesco })}>
@@ -287,15 +289,14 @@ export function ClienteVinculos() {
               </SelectContent>
             </Select>
           </Campo>
-          <Button type="button" onClick={vincular}>
+          <Button type="button" onClick={vincular} disabled={buscando}>
             <Link2 className="size-3.5" />
             Vincular
           </Button>
         </div>
         {vinculos.length > 0 && (
-          <DataTable data={vinculos} columns={columns} keyExtractor={(row, index) => `${index}-${row.nome}`} />
+          <DataTable data={vinculos} columns={columns} keyExtractor={(row) => row.customerId} />
         )}
-        <NaoGravado>Os vínculos ainda não são gravados: a API de clientes não tem esse campo.</NaoGravado>
       </FormSection>
     </Card>
   );
