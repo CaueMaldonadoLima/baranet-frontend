@@ -57,11 +57,11 @@ export const TIPOS_CADASTRO = [
 export type TipoCadastro = (typeof TIPOS_CADASTRO)[number]["value"];
 
 /** Aba da ficha que lista cada tipo (o "Alterar" abre a busca nela) */
-const ABA_DA_FICHA: Record<TipoCadastro, string | null> = {
+const ABA_DA_FICHA: Record<TipoCadastro, string> = {
   cliente: "cliente",
   fornecedor: "fornecedor",
   funcionario: "usuario",
-  representante: null,
+  representante: "representante",
 };
 
 export function ehTipo(valor: string | undefined): valor is TipoCadastro {
@@ -193,8 +193,7 @@ function FormularioCadastro({
     }
   }
 
-  const abaDaFicha = ABA_DA_FICHA[tipoCadastro];
-  const lista = abaDaFicha ? `/cadastro?aba=${abaDaFicha}` : "/cadastro";
+  const lista = `/cadastro?aba=${ABA_DA_FICHA[tipoCadastro]}`;
 
   const seletorTipo = (
     <Campo id="cadastrar-como" label="Cadastrar como">
@@ -218,18 +217,9 @@ function FormularioCadastro({
       <Button size="sm" onClick={handleIncluir}>
         Incluir
       </Button>
-      {abaDaFicha ? (
-        <Button size="sm" asChild>
-          <Link href={lista}>Alterar</Link>
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          onClick={() => toast.info("Alteração de representante ainda não disponível", "A API ainda não tem este tipo de cadastro.")}
-        >
-          Alterar
-        </Button>
-      )}
+      <Button size="sm" asChild>
+        <Link href={lista}>Alterar</Link>
+      </Button>
       <Button size="sm" onClick={handleSave} disabled={salvando || carregamento.status !== "ok"}>
         {salvando ? "Gravando..." : "Gravar"}
       </Button>

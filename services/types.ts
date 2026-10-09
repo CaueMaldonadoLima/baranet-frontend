@@ -363,9 +363,10 @@ export interface CustomerWrite {
   state?: string | null;
 }
 // Pessoa: cadastro-base (nome, documento, endereço) compartilhado pelos
-// papéis. Cliente, fornecedor, funcionário, médico e convênio são papéis
+// papéis. Cliente, fornecedor, funcionário, médico, convênio e representante
+// (de marca) são papéis
 // ligados a ela por personId (GET /people — ver docs/backend-contract.md).
-export type PersonRole = "customer" | "supplier" | "employee" | "doctor" | "agreement";
+export type PersonRole = "customer" | "supplier" | "employee" | "doctor" | "agreement" | "representative";
 /** `without_*` servem aos pickers de "Salvar como" (pessoas sem o papel). */
 export type PersonRoleFilter = PersonRole | "without_supplier" | "without_customer";
 export interface PersonAddress {
@@ -407,6 +408,7 @@ export interface Person {
   employeeId: number | null;
   doctorId: number | null;
   agreementId: number | null;
+  representativeId: number | null;
 }
 // Marca (fabricante) e seus Representantes comerciais — ver CONTEXT.md.
 // Não confundir com o Tipo de Cadastro "Representante".
