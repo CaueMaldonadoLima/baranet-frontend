@@ -25,6 +25,7 @@ const ABAS = [
   { value: "cliente", label: "Cliente", role: "customer", tipoCadastro: "cliente" },
   { value: "fornecedor", label: "Fornecedor", role: "supplier", tipoCadastro: "fornecedor" },
   { value: "usuario", label: "Usuário", role: "employee", tipoCadastro: "funcionario" },
+  { value: "representante", label: "Representante", role: "representative", tipoCadastro: "representante" },
   { value: "financeiro", label: "Financeiro", role: null, tipoCadastro: null },
   { value: "medico", label: "Médico / Optometrista", role: "doctor", tipoCadastro: null },
   { value: "convenio", label: "Convênio", role: "agreement", tipoCadastro: null },
@@ -55,6 +56,7 @@ const PAPEL_LABEL: Record<PersonRole, string> = {
   employee: "Usuário",
   doctor: "Médico",
   agreement: "Convênio",
+  representative: "Representante",
 };
 
 // Cada campo vira um filtro próprio de GET /people (a API ignora máscaras).
