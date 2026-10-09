@@ -64,6 +64,14 @@ const ABA_DA_FICHA: Record<TipoCadastro, string | null> = {
   representante: null,
 };
 
+/** Pessoa física ou jurídica com que um cadastro novo começa */
+const PESSOA_PADRAO: Record<TipoCadastro, FornecedorForm["pessoa"]> = {
+  cliente: "fisica",
+  fornecedor: "juridica",
+  funcionario: "fisica",
+  representante: "juridica",
+};
+
 export function ehTipo(valor: string | undefined): valor is TipoCadastro {
   return TIPOS_CADASTRO.some((t) => t.value === valor);
 }
@@ -104,7 +112,10 @@ function FormularioCadastro({
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
   const [cliente, setCliente] = useState<ClienteForm>(clienteVazio);
   // Fornecedor, funcionário e representante compartilham o cadastro rápido.
-  const [pessoa, setPessoa] = useState<FornecedorForm>(fornecedorVazio);
+  const [pessoa, setPessoa] = useState<FornecedorForm>(() => ({
+    ...fornecedorVazio(),
+    pessoa: PESSOA_PADRAO[tipoInicial],
+  }));
   const [carregamento, setCarregamento] = useState<Carregamento>(
     editando ? { status: "carregando" } : { status: "ok" }
   );
@@ -142,6 +153,13 @@ function FormularioCadastro({
   }, [id, tipoInicial, tentativa]);
 
   const atualizarCliente = (patch: Partial<ClienteForm>) => setCliente((prev) => ({ ...prev, ...patch }));
+  // Num cadastro novo, trocar o tipo também troca física/jurídica para o padrão do tipo.
+  function trocarTipo(tipo: TipoCadastro) {
+    if (editando) return;
+    setTipoCadastro(tipo);
+    setPessoa((prev) => ({ ...prev, pessoa: PESSOA_PADRAO[tipo] }));
+  }
+
   const atualizarPessoa = (patch: Partial<FornecedorForm>) => setPessoa((prev) => ({ ...prev, ...patch }));
 
   const rotuloTipo = TIPOS_CADASTRO.find((t) => t.value === tipoCadastro)!.label;
@@ -198,7 +216,7 @@ function FormularioCadastro({
 
   const seletorTipo = (
     <Campo id="cadastrar-como" label="Cadastrar como">
-      <Select value={tipoCadastro} onValueChange={(v) => setTipoCadastro(v as TipoCadastro)} disabled={editando}>
+      <Select value={tipoCadastro} onValueChange={(v) => trocarTipo(v as TipoCadastro)} disabled={editando}>
         <SelectTrigger id="cadastrar-como" className="w-full">
           <SelectValue placeholder="Selecione" />
         </SelectTrigger>
@@ -283,9 +301,7 @@ function FormularioCadastro({
                   <RadioGroup
                     name="tipoCadastro"
                     value={tipoCadastro}
-                    onValueChange={(v) => {
-                      if (!editando) setTipoCadastro(v as TipoCadastro);
-                    }}
+                    onValueChange={(v) => trocarTipo(v as TipoCadastro)}
                     className="flex-row flex-wrap gap-x-6 gap-y-2 rounded-lg border border-input p-3"
                   >
                     {TIPOS_CADASTRO.map((t) => (
