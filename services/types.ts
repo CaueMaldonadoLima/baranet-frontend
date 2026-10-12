@@ -473,16 +473,46 @@ export interface RepresentativeWrite {
   phone?: string;
   email?: string;
 }
+/** Função do funcionário na ótica (o mesmo role do usuário logado) */
+export type EmployeeRole = "gerente" | "vendedor" | "optometrista" | "caixa";
+/** Funcionário (GET /employees/{employee}) — schema Employee do Swagger. `id` é o de optica_users, não o personId. */
 export interface Employee {
   id: number;
+  personId?: number | null;
+  personType?: "fisica" | "juridica" | null;
   name: string;
-  role: string;
+  document?: string | null;
+  ddd?: string | null;
+  role: EmployeeRole;
   email: string;
-  phone: string;
-  store: string;
-  status: string;
+  phone?: string | null;
+  /** Nome da loja */
+  store?: string | null;
+  /** Id da loja, como string */
+  storeId?: string | null;
+  status: "ativo" | "inativo";
   commission: number;
   sales: number;
+  hasPassword: boolean;
+  address?: Partial<PersonAddress>;
+  roles?: PersonRole[];
+}
+/** POST/PUT /employees — schema EmployeeWrite do Swagger */
+export interface EmployeeWrite {
+  personId?: number;
+  personType?: "fisica" | "juridica";
+  name?: string | null;
+  document?: string | null;
+  ddd?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  status?: "ativo" | "inativo";
+  role?: EmployeeRole;
+  commission?: number | null;
+  storeId?: number | null;
+  password?: string;
+  password_confirmation?: string;
+  address?: Partial<Record<keyof PersonAddress, string | null>>;
 }
 export interface FiscalNote {
   id: number;
