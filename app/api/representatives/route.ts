@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { baranetFetch, readJson, resolveOpticaId, OPTICA_COOKIE } from "@/lib/server/baranet";
 import type { BaranetErrorBody } from "@/lib/server/baranet";
 
-// Representantes de marca (tela 18) — não é o Tipo de Cadastro "Representante".
+// Representantes de marca (tela 18): papel sobre people.
 export async function GET(request: NextRequest) {
   const opticaId = resolveOpticaId(request.cookies.get(OPTICA_COOKIE)?.value);
   const qs = request.nextUrl.search;

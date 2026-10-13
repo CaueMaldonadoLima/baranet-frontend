@@ -2,7 +2,7 @@
 
 import { use, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { AlertCircle, List, Plus, Search, Settings } from "lucide-react";
+import { AlertCircle, List, Plus, Search, Settings, Tag } from "lucide-react";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
@@ -22,19 +22,20 @@ import { AbaFinanceiro } from "./_components/ficha/popup-financeiro";
 // — ver ADR 0002. Financeiro não é papel: na API é visão operacional de
 // saldos, então a aba busca em todas as pessoas.
 const ABAS = [
-  { value: "cliente", label: "Cliente", role: "customer", tipoCadastro: "cliente" },
-  { value: "fornecedor", label: "Fornecedor", role: "supplier", tipoCadastro: "fornecedor" },
-  { value: "usuario", label: "Usuário", role: "employee", tipoCadastro: "funcionario" },
-  { value: "representante", label: "Representante", role: "representative", tipoCadastro: "representante" },
-  { value: "financeiro", label: "Financeiro", role: null, tipoCadastro: null },
-  { value: "medico", label: "Médico / Optometrista", role: "doctor", tipoCadastro: null },
-  { value: "convenio", label: "Convênio", role: "agreement", tipoCadastro: null },
+  { value: "cliente", label: "Cliente", role: "customer", incluir: "/cadastro/novo?tipo=cliente" },
+  { value: "fornecedor", label: "Fornecedor", role: "supplier", incluir: "/cadastro/novo?tipo=fornecedor" },
+  { value: "usuario", label: "Usuário", role: "employee", incluir: "/cadastro/novo?tipo=funcionario" },
+  // Representante só se cadastra dentro da marca (aba Representantes, tela 18).
+  { value: "representante", label: "Representante", role: "representative", incluir: "/cadastro/marcas/nova" },
+  { value: "financeiro", label: "Financeiro", role: null, incluir: null },
+  { value: "medico", label: "Médico / Optometrista", role: "doctor", incluir: null },
+  { value: "convenio", label: "Convênio", role: "agreement", incluir: null },
 ] as const satisfies readonly {
   value: string;
   label: string;
   role: PersonRole | null;
-  /** Tipo que /cadastro/novo já sabe abrir via ?tipo= */
-  tipoCadastro: string | null;
+  /** Onde o "Incluir novo" da aba abre o cadastro */
+  incluir: string | null;
 }[];
 
 type Aba = (typeof ABAS)[number]["value"];
@@ -221,7 +222,15 @@ export default function FichaCadastroPage({
 
   return (
     <div className="px-[4.2vw] py-8 space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Cadastro (pessoa física e jurídica)</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold tracking-tight">Cadastro (pessoa física e jurídica)</h1>
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/cadastro/marcas/nova">
+            <Tag className="size-3.5" />
+            Cadastrar marca
+          </Link>
+        </Button>
+      </div>
 
       <Card className="px-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -286,9 +295,9 @@ export default function FichaCadastroPage({
             ))}
           </div>
 
-          {abaAtual.tipoCadastro ? (
+          {abaAtual.incluir ? (
             <Button size="sm" asChild>
-              <Link href={`/cadastro/novo?tipo=${abaAtual.tipoCadastro}`}>
+              <Link href={abaAtual.incluir}>
                 <Plus className="size-3.5" />
                 Incluir novo
               </Link>

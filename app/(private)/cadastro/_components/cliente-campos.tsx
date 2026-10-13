@@ -17,12 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { REDES_SOCIAIS, type ClienteForm } from "../_lib/cliente-form";
+import { UFS } from "../_lib/comum";
 import { Campo } from "./campo";
-
-const UFS = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
-  "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
-];
 
 type Atualizar = (patch: Partial<ClienteForm>) => void;
 

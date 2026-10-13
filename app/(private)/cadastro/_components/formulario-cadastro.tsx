@@ -65,6 +65,15 @@ export const TIPOS_CADASTRO = [
 
 export type TipoCadastro = (typeof TIPOS_CADASTRO)[number]["value"];
 
+// Representante só se cadastra dentro da marca (aba Representantes, tela 18),
+// segundo o parceiro: o tipo fica oculto no "Cadastrar como" por enquanto.
+const MOSTRAR_TIPO_REPRESENTANTE = false;
+
+/** Tipos que o "Cadastrar como" oferece */
+export const TIPOS_VISIVEIS = TIPOS_CADASTRO.filter(
+  (t) => t.value !== "representante" || MOSTRAR_TIPO_REPRESENTANTE
+);
+
 /** Aba da ficha que lista cada tipo (o "Alterar" abre a busca nela) */
 const ABA_DA_FICHA: Record<TipoCadastro, string> = {
   cliente: "cliente",
@@ -80,10 +89,6 @@ const PESSOA_PADRAO: Record<TipoCadastro, FornecedorForm["pessoa"]> = {
   funcionario: "fisica",
   representante: "juridica",
 };
-
-export function ehTipo(valor: string | undefined): valor is TipoCadastro {
-  return TIPOS_CADASTRO.some((t) => t.value === valor);
-}
 
 type Carregamento = { status: "ok" } | { status: "carregando" } | { status: "erro"; mensagem: string };
 
@@ -282,7 +287,7 @@ function FormularioCadastro({
           <SelectValue placeholder="Selecione" />
         </SelectTrigger>
         <SelectContent>
-          {TIPOS_CADASTRO.map((t) => (
+          {TIPOS_VISIVEIS.map((t) => (
             <SelectItem key={t.value} value={t.value}>
               {t.label}
             </SelectItem>
