@@ -28,7 +28,7 @@ Funcionário com permissão para aprovar operações pendentes de outros usuári
 ### Catálogo e representação comercial
 
 **Marca**:
-Fabricante/marca de um produto (ex: armação, lente), cadastrada com logo, histórico e segmentos (categorias de produto que a marca atende). Conceito que aparece no protótipo do cadastro unificado, mas não é mencionado na ata de requisitos. Existe na API (`/brands`, com vínculo ao fornecedor em `/suppliers/{id}/brands`).
+Fabricante/marca de um produto (ex: armação, lente), cadastrada com logo, histórico e segmentos (categorias de produto que a marca atende). Conceito que aparece no protótipo do cadastro unificado, mas não é mencionado na ata de requisitos. Existe na API (`/brands`, com vínculo ao fornecedor em `/suppliers/{id}/brands`). A lista de marcas (`/cadastro/marcas`) não está no protótipo: foi criada em 2026-10-13 para abrir e alterar marcas fora da ficha do fornecedor.
 
 **Representante (de marca)**:
 Contato comercial de uma ou mais Marcas (N:N), com segmentos (armações, lentes, lentes de contato, máquinas e equipamentos, acessórios), estado e cidade. É um papel sobre a Pessoa (`/representatives`; `code` = id): o Código da tela 18 reaproveita uma Pessoa existente (`personId`). Vigência aparece no protótipo, mas ainda não existe na API.

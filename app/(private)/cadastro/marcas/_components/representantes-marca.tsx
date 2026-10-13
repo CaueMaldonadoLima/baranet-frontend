@@ -18,8 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 import { peopleService, representativesService } from "@/services/erp";
 import { mensagemDeErro, type Representative } from "@/services/types";
-import { Campo } from "../../../_components/campo";
-import { UFS } from "../../../_lib/comum";
+import { Campo } from "../../_components/campo";
+import { UFS } from "../../_lib/comum";
 import {
   SEGMENTOS_REPRESENTANTE,
   formParaRepresentativeWrite,
@@ -29,7 +29,7 @@ import {
   rotuloSegmentos,
   validarRepresentante,
   type RepresentanteForm,
-} from "../../../_lib/representante-form";
+} from "../../_lib/representante-form";
 
 type Resultado =
   | { status: "carregando" }

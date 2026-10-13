@@ -225,9 +225,9 @@ export default function FichaCadastroPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Cadastro (pessoa física e jurídica)</h1>
         <Button size="sm" variant="outline" asChild>
-          <Link href="/cadastro/marcas/nova">
+          <Link href="/cadastro/marcas">
             <Tag className="size-3.5" />
-            Cadastrar marca
+            Marcas
           </Link>
         </Button>
       </div>
