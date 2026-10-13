@@ -47,6 +47,7 @@ function ehAba(valor: string | undefined): valor is Aba {
 function linkEdicao(pessoa: Person, aba: Aba): string | null {
   if (aba === "cliente" && pessoa.customerId !== null) return `/cadastro/cliente/${pessoa.customerId}`;
   if (aba === "fornecedor" && pessoa.supplierId !== null) return `/cadastro/fornecedor/${pessoa.supplierId}`;
+  if (aba === "usuario" && pessoa.employeeId !== null) return `/cadastro/funcionario/${pessoa.employeeId}`;
   return null;
 }
 

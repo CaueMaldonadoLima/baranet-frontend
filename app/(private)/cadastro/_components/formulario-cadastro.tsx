@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Copy } from "lucide-react";
 import { Badge } from "@/components/shared/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormSection } from "@/components/shared/form-section";
+import { Modal, ModalFooter } from "@/components/shared/modal";
 import { Skeleton } from "@/components/shared/skeleton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,13 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/shared/toast";
-import { customersService, suppliersService } from "@/services/erp";
+import { customersService, employeesService, suppliersService } from "@/services/erp";
 import { ApiRequestError, mensagemDeErro } from "@/services/types";
 import { Campo } from "./campo";
 import { ClienteCompleto, ClienteRapido, ClienteRedesSociais } from "./cliente-campos";
 import { ClienteDadosComerciais, ClienteVinculos } from "./cliente-extras";
 import { EnderecoCampos } from "./endereco-campos";
 import { FornecedorCompleto } from "./fornecedor-completo";
+import { FuncionarioRapido } from "./funcionario-rapido";
 import { FuncionarioSecoes } from "./funcionario-secoes";
 import { PessoaRapido } from "./pessoa-rapido";
 import {
@@ -42,6 +44,13 @@ import {
   validarFornecedor,
   type FornecedorForm,
 } from "../_lib/fornecedor-form";
+import {
+  formParaFuncionarioWrite,
+  funcionarioParaForm,
+  funcionarioVazio,
+  validarFuncionario,
+  type FuncionarioForm,
+} from "../_lib/funcionario-form";
 
 // Cadastro especial (Loja / Usuário / Usuário Pagador / Banco) ainda não é
 // gravado: fica oculto até a regra ser definida (ver CONTEXT.md).
@@ -79,8 +88,8 @@ export function ehTipo(valor: string | undefined): valor is TipoCadastro {
 type Carregamento = { status: "ok" } | { status: "carregando" } | { status: "erro"; mensagem: string };
 
 // Formulário de cadastro, aberto a partir da lista (/cadastro): um cadastro
-// novo em /cadastro/novo?tipo=<tipo>, ou um existente (cliente ou fornecedor)
-// em /cadastro/<tipo>/<id>.
+// novo em /cadastro/novo?tipo=<tipo>, ou um existente (cliente, fornecedor ou
+// funcionário) em /cadastro/<tipo>/<id>.
 export function Cadastro({ tipoInicial, id }: { tipoInicial: TipoCadastro; id: number | null }) {
   // "Incluir" num cadastro novo não muda a URL: este contador remonta o formulário.
   const [novo, setNovo] = useState(0);
@@ -111,7 +120,8 @@ function FormularioCadastro({
   const [tipoCadastro, setTipoCadastro] = useState<TipoCadastro>(tipoInicial);
   const [cadastroEspecial, setCadastroEspecial] = useState("usuario");
   const [cliente, setCliente] = useState<ClienteForm>(clienteVazio);
-  // Fornecedor, funcionário e representante compartilham o cadastro rápido.
+  const [funcionario, setFuncionario] = useState<FuncionarioForm>(funcionarioVazio);
+  // Fornecedor e representante compartilham o cadastro rápido.
   const [pessoa, setPessoa] = useState<FornecedorForm>(() => ({
     ...fornecedorVazio(),
     pessoa: PESSOA_PADRAO[tipoInicial],
@@ -122,8 +132,11 @@ function FormularioCadastro({
   const [tentativa, setTentativa] = useState(0);
   const [salvando, setSalvando] = useState(false);
   // Código exibido = id da Pessoa, o mesmo da lista. O id da URL é o do papel
-  // (cliente/fornecedor), que tem numeração própria.
+  // (cliente/fornecedor/funcionário), que tem numeração própria.
   const [codigoPessoa, setCodigoPessoa] = useState<number | null>(null);
+  // Funcionário criado sem senha: a API devolve o código de primeiro acesso uma
+  // única vez. A tela só passa a editar o registro depois de fechar o aviso.
+  const [primeiroAcesso, setPrimeiroAcesso] = useState<{ token: string; id: number } | null>(null);
 
   useEffect(() => {
     if (id === null) return;
@@ -135,11 +148,17 @@ function FormularioCadastro({
             setPessoa(fornecedorParaForm(s));
             setCodigoPessoa(s.personId);
           })
-        : customersService.get(id).then((c) => {
-            if (!ativo) return;
-            setCliente(clienteParaForm(c));
-            setCodigoPessoa(c.personId);
-          });
+        : tipoInicial === "funcionario"
+          ? employeesService.get(id).then((e) => {
+              if (!ativo) return;
+              setFuncionario(funcionarioParaForm(e));
+              setCodigoPessoa(e.personId ?? null);
+            })
+          : customersService.get(id).then((c) => {
+              if (!ativo) return;
+              setCliente(clienteParaForm(c));
+              setCodigoPessoa(c.personId);
+            });
     carregar
       .then(() => {
         if (ativo) setCarregamento({ status: "ok" });
@@ -161,6 +180,8 @@ function FormularioCadastro({
   }
 
   const atualizarPessoa = (patch: Partial<FornecedorForm>) => setPessoa((prev) => ({ ...prev, ...patch }));
+  const atualizarFuncionario = (patch: Partial<FuncionarioForm>) =>
+    setFuncionario((prev) => ({ ...prev, ...patch }));
 
   const rotuloTipo = TIPOS_CADASTRO.find((t) => t.value === tipoCadastro)!.label;
 
@@ -171,15 +192,17 @@ function FormularioCadastro({
   }
 
   async function handleSave() {
-    if (tipoCadastro === "funcionario" || tipoCadastro === "representante") {
-      toast.info(
-        `Cadastro de ${tipoCadastro === "funcionario" ? "funcionário" : "representante"} ainda não disponível`,
-        "Este tipo de cadastro ainda não é gravado na API."
-      );
+    if (tipoCadastro === "representante") {
+      toast.info("Cadastro de representante ainda não disponível", "Este tipo de cadastro ainda não é gravado na API.");
       return;
     }
 
-    const erro = tipoCadastro === "fornecedor" ? validarFornecedor(pessoa) : validarCliente(cliente);
+    const erro =
+      tipoCadastro === "fornecedor"
+        ? validarFornecedor(pessoa)
+        : tipoCadastro === "funcionario"
+          ? validarFuncionario(funcionario)
+          : validarCliente(cliente);
     if (erro) {
       toast.warning(erro);
       return;
@@ -188,15 +211,37 @@ function FormularioCadastro({
     setSalvando(true);
     try {
       let salvoId: number;
+      let tokenPrimeiroAcesso: string | undefined;
       if (tipoCadastro === "fornecedor") {
         const payload = formParaFornecedorWrite(pessoa, editando ? "editar" : "criar");
         salvoId = (editando ? await suppliersService.update(id, payload) : await suppliersService.create(payload)).id;
+      } else if (tipoCadastro === "funcionario") {
+        const payload = formParaFuncionarioWrite(funcionario, editando ? "editar" : "criar");
+        if (editando) {
+          const salvo = await employeesService.update(id, payload);
+          salvoId = salvo.id;
+          // Senha gravada: limpa os campos e passa a mostrar "já tem senha".
+          setFuncionario((prev) => ({
+            ...prev,
+            senhaManual: false,
+            senha: "",
+            confirmacaoSenha: "",
+            temSenha: salvo.hasPassword ?? prev.temSenha,
+          }));
+        } else {
+          const criado = await employeesService.create(payload);
+          salvoId = criado.id;
+          tokenPrimeiroAcesso = criado.firstAccessToken;
+        }
       } else {
         const payload = formParaClienteWrite(cliente, editando ? "editar" : "criar");
         salvoId = (editando ? await customersService.update(id, payload) : await customersService.create(payload)).id;
       }
-      const rotulo = tipoCadastro === "fornecedor" ? "Fornecedor" : "Cliente";
-      toast.success(editando ? `${rotulo} atualizado.` : `${rotulo} cadastrado com sucesso.`);
+      toast.success(editando ? `${rotuloTipo} atualizado.` : `${rotuloTipo} cadastrado com sucesso.`);
+      if (tokenPrimeiroAcesso) {
+        setPrimeiroAcesso({ token: tokenPrimeiroAcesso, id: salvoId });
+        return;
+      }
       // Depois de criar, a tela passa a editar o registro: um novo Gravar atualiza, não duplica.
       if (!editando) router.replace(`/cadastro/${tipoCadastro}/${salvoId}`);
     } catch (err) {
@@ -212,6 +257,23 @@ function FormularioCadastro({
   }
 
   const lista = `/cadastro?aba=${ABA_DA_FICHA[tipoCadastro]}`;
+
+  function fecharPrimeiroAcesso() {
+    if (!primeiroAcesso) return;
+    const criadoId = primeiroAcesso.id;
+    setPrimeiroAcesso(null);
+    router.replace(`/cadastro/funcionario/${criadoId}`);
+  }
+
+  async function copiarToken() {
+    if (!primeiroAcesso) return;
+    try {
+      await navigator.clipboard.writeText(primeiroAcesso.token);
+      toast.success("Código copiado.");
+    } catch {
+      toast.warning("Não foi possível copiar", "Selecione o código e copie manualmente.");
+    }
+  }
 
   const seletorTipo = (
     <Campo id="cadastrar-como" label="Cadastrar como">
@@ -332,6 +394,13 @@ function FormularioCadastro({
             <FormSection title="Cadastro rápido">
               {tipoCadastro === "cliente" ? (
                 <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={codigoPessoa} seletorTipo={seletorTipo} />
+              ) : tipoCadastro === "funcionario" ? (
+                <FuncionarioRapido
+                  form={funcionario}
+                  atualizar={atualizarFuncionario}
+                  codigo={codigoPessoa}
+                  seletorTipo={seletorTipo}
+                />
               ) : (
                 <PessoaRapido
                   form={pessoa}
@@ -366,7 +435,15 @@ function FormularioCadastro({
             <FornecedorCompleto form={pessoa} atualizar={atualizarPessoa} editando={editando} />
           )}
 
-          {tipoCadastro === "funcionario" && <FuncionarioSecoes />}
+          {tipoCadastro === "funcionario" && (
+            <EnderecoCampos
+              endereco={funcionario.endereco}
+              onChange={(endereco) => atualizarFuncionario({ endereco })}
+            />
+          )}
+          {tipoCadastro === "funcionario" && (
+            <FuncionarioSecoes form={funcionario} atualizar={atualizarFuncionario} editando={editando} />
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button variant="outline" asChild>
@@ -378,6 +455,30 @@ function FormularioCadastro({
           </div>
         </div>
       )}
+
+      <Modal
+        open={primeiroAcesso !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) fecharPrimeiroAcesso();
+        }}
+        title="Código de primeiro acesso"
+        description="O funcionário foi cadastrado sem senha. Passe este código a ele para o primeiro acesso: ele não será mostrado de novo."
+        size="md"
+        persistent
+      >
+        <div className="flex items-center gap-2">
+          <code className="flex-1 break-all rounded-md border border-input bg-muted px-3 py-2 font-mono text-sm select-all">
+            {primeiroAcesso?.token}
+          </code>
+          <Button type="button" size="sm" variant="outline" onClick={copiarToken}>
+            <Copy className="size-3.5" />
+            Copiar
+          </Button>
+        </div>
+        <ModalFooter>
+          <Button onClick={fecharPrimeiroAcesso}>Já anotei</Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }
