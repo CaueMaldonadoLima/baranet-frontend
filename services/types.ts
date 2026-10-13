@@ -447,10 +447,10 @@ export interface SupplierBrand extends Brand {
 }
 export interface BrandWrite {
   name: string;
-  code?: string;
-  origin?: string;
-  logoUrl?: string;
-  history?: string;
+  code?: string | null;
+  origin?: string | null;
+  logoUrl?: string | null;
+  history?: string | null;
   active?: boolean;
   segments?: Omit<BrandSegment, "id">[];
   representativeIds?: number[];
