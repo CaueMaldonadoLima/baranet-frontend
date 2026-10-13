@@ -462,16 +462,49 @@ export interface SupplierBrandAttach {
   validUntil?: string;
   representativeId?: number;
 }
+/** Segmento do representante (a API aceita também o rótulo em português) */
+export type RepresentativeSegmentSlug =
+  | "armacoes"
+  | "lentes"
+  | "lentes_de_contato"
+  | "maquinas_e_equipamentos"
+  | "acessorios";
 /**
- * GET /representatives — o Swagger ainda não documenta schema nem filtros.
- * Só `name` é obrigatório no POST; phone/email seguem o representante
- * embutido na Brand.
+ * /representatives — o Swagger não documenta o schema: segue o contrato
+ * passado pelo parceiro e a resposta real da API. É um papel sobre people;
+ * `code` = `id`.
  */
-export type Representative = BrandRepresentative;
-export interface RepresentativeWrite {
+export interface Representative {
+  id: number;
+  code: number;
+  personId: number;
+  personType: "fisica" | "juridica";
   name: string;
-  phone?: string;
-  email?: string;
+  document: string | null;
+  whatsapp: string | null;
+  phone: string | null;
+  email: string | null;
+  status: "ativo" | "inativo";
+  state: string | null;
+  city: string | null;
+  company: string | null;
+  segments: { slug: RepresentativeSegmentSlug; label: string }[];
+  brandIds: number[];
+  active: boolean;
+}
+/** `name` é obrigatório sem `personId` (com ele, reaproveita a pessoa) */
+export interface RepresentativeWrite {
+  personId?: number;
+  name?: string | null;
+  document?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  state?: string | null;
+  city?: string | null;
+  company?: string | null;
+  segments?: RepresentativeSegmentSlug[];
+  brandIds?: number[];
+  active?: boolean;
 }
 /** Função do funcionário na ótica (o mesmo role do usuário logado) */
 export type EmployeeRole = "gerente" | "vendedor" | "optometrista" | "caixa";

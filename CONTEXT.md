@@ -15,7 +15,7 @@ _Avoid_: Registro, ficha (usados de forma intercambiável na ata, mas "Cadastro"
 
 **Tipo de Cadastro**:
 Classifica um Cadastro como Cliente, Fornecedor, Funcionário, Administrador ou Representante. Determina quais campos aparecem na tela de cadastro (regra ainda não implementada — hoje a tela mostra todos os campos de todos os tipos simultaneamente).
-- **Representante**: tipo já presente no seletor da tela, mas sem menção na ata e **não** é um papel de Pessoa na API (os papéis são cliente, fornecedor, funcionário, médico/optometrista e convênio). O `/representatives` da API é o Representante de marca (ver abaixo). Mantido bloqueado (toast de aviso) até virar requisito formal.
+- **Representante**: é o mesmo Representante de marca (ver abaixo), papel `representative` sobre a Pessoa. Segundo o parceiro (2026-10-13), só se cadastra dentro da Marca: o tipo fica oculto no "Cadastrar como" (`MOSTRAR_TIPO_REPRESENTANTE`) e o "Incluir novo" da aba Representante abre o cadastro de marcas.
 - **Cadastro especial** (Loja / Usuário / Usuário Pagador / Banco): estava no protótipo, mas não é mencionado na ata e nunca foi gravado. Vai existir, mas está **oculto na tela desde 2026-10-08** (constante `MOSTRAR_CADASTRO_ESPECIAL`) para não gerar ruído enquanto não funciona. Significado de negócio **pendente de esclarecimento com o cliente** — não presumir função.
 
 **Usuário**:
@@ -31,7 +31,7 @@ Funcionário com permissão para aprovar operações pendentes de outros usuári
 Fabricante/marca de um produto (ex: armação, lente), cadastrada com logo, histórico e segmentos (categorias de produto que a marca atende). Conceito que aparece no protótipo do cadastro unificado, mas não é mencionado na ata de requisitos. Existe na API (`/brands`, com vínculo ao fornecedor em `/suppliers/{id}/brands`).
 
 **Representante (de marca)**:
-Contato comercial vinculado a uma Marca para uma combinação de segmento/estado/cidade, com vigência. **Não confundir com o Tipo de Cadastro "Representante"** (opção do seletor da tela de cadastro, hoje bloqueada e sem papel correspondente na API) — são dois conceitos distintos que usam o mesmo nome.
+Contato comercial de uma ou mais Marcas (N:N), com segmentos (armações, lentes, lentes de contato, máquinas e equipamentos, acessórios), estado e cidade. É um papel sobre a Pessoa (`/representatives`; `code` = id): o Código da tela 18 reaproveita uma Pessoa existente (`personId`). Vigência aparece no protótipo, mas ainda não existe na API.
 
 ### Operação
 
