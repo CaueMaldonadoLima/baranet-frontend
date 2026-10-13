@@ -17,7 +17,11 @@ export const brandsService = {
   list: (params: ListBrandsParams = {}) =>
     api.get<PaginatedResponse<Brand>>(`/brands${toQueryString({ ...params })}`),
 
+  get: (id: number) => api.get<Brand>(`/brands/${id}`),
+
   create: (data: BrandWrite) => api.post<Brand>("/brands", data),
+
+  update: (id: number, data: BrandWrite) => api.put<Brand>(`/brands/${id}`, data),
 
   /** Marcas vinculadas ao fornecedor, com os campos do vínculo */
   listBySupplier: (supplierId: number) =>

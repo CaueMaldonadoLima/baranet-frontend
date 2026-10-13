@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { FuncionarioForm } from "../_lib/funcionario-form";
 
 const WEEK_DAYS = ["Todos", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
@@ -77,9 +78,17 @@ const FILA_OPCOES = [
 
 // Seções só de funcionário da tela Cadastro (protótipo "Usuários"): acesso,
 // senha, horário, direitos de acesso, admissão, adicionais, benefícios, férias
-// e 13º. Ainda não são gravadas na API.
-export function FuncionarioSecoes() {
-  const [senhaManual, setSenhaManual] = useState(false);
+// e 13º. Só a senha é gravada na API; o resto ainda fica só na tela.
+export function FuncionarioSecoes({
+  form,
+  atualizar,
+  editando,
+}: {
+  form: FuncionarioForm;
+  atualizar: (patch: Partial<FuncionarioForm>) => void;
+  editando: boolean;
+}) {
+  const senhaManual = form.senhaManual;
   const [showPassword, setShowPassword] = useState(false);
   const [trocarProximoAcesso, setTrocarProximoAcesso] = useState(false);
   const [funcTab, setFuncTab] = useState<"usuario" | "direitos">("usuario");
@@ -133,10 +142,23 @@ export function FuncionarioSecoes() {
         <label className="flex items-center gap-2.5 cursor-pointer">
           <Checkbox
             checked={senhaManual}
-            onCheckedChange={(checked) => setSenhaManual(checked === true)}
+            onCheckedChange={(checked) =>
+              atualizar({ senhaManual: checked === true, senha: "", confirmacaoSenha: "" })
+            }
           />
-          <span className="text-sm text-foreground">Definir senha manualmente</span>
+          <span className="text-sm text-foreground">
+            {form.temSenha ? "Trocar a senha" : "Definir senha manualmente"}
+          </span>
         </label>
+        {!senhaManual && (
+          <p className="text-xs text-muted-foreground">
+            {form.temSenha
+              ? "O funcionário já tem senha cadastrada; ela continua a mesma."
+              : editando
+                ? "O funcionário ainda não definiu a senha (primeiro acesso pendente)."
+                : "Sem senha, o sistema gera um código de primeiro acesso ao gravar."}
+          </p>
+        )}
 
         {senhaManual && (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -147,6 +169,9 @@ export function FuncionarioSecoes() {
                   type={showPassword ? "text" : "password"}
                   placeholder="Senha"
                   className="pr-9"
+                  autoComplete="new-password"
+                  value={form.senha}
+                  onChange={(e) => atualizar({ senha: e.target.value })}
                 />
                 <button
                   type="button"
@@ -164,7 +189,13 @@ export function FuncionarioSecoes() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Repetir senha</label>
-              <Input type={showPassword ? "text" : "password"} placeholder="Repetir senha" />
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Repetir senha"
+                autoComplete="new-password"
+                value={form.confirmacaoSenha}
+                onChange={(e) => atualizar({ confirmacaoSenha: e.target.value })}
+              />
             </div>
           </div>
         )}
