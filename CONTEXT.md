@@ -15,7 +15,7 @@ _Avoid_: Registro, ficha (usados de forma intercambiável na ata, mas "Cadastro"
 
 **Tipo de Cadastro**:
 Classifica um Cadastro como Cliente, Fornecedor, Funcionário, Administrador ou Representante. Determina quais campos aparecem na tela de cadastro (regra ainda não implementada — hoje a tela mostra todos os campos de todos os tipos simultaneamente).
-- **Representante**: é o mesmo Representante de marca (ver abaixo), papel `representative` sobre a Pessoa. Segundo o parceiro (2026-10-13), só se cadastra dentro da Marca: o tipo fica oculto no "Cadastrar como" (`MOSTRAR_TIPO_REPRESENTANTE`) e o "Incluir novo" da aba Representante abre o cadastro de marcas.
+- **Representante**: é o mesmo Representante de marca (ver abaixo), papel `representative` sobre a Pessoa. Segundo o parceiro (2026-10-13), só se cadastra dentro da Marca: escolher o tipo no formulário (`REPRESENTANTE_SO_NA_MARCA`) e o "Incluir novo" da aba Representante levam ao cadastro de marcas.
 - **Cadastro especial** (Loja / Usuário / Usuário Pagador / Banco): estava no protótipo, mas não é mencionado na ata e nunca foi gravado. Vai existir, mas está **oculto na tela desde 2026-10-08** (constante `MOSTRAR_CADASTRO_ESPECIAL`) para não gerar ruído enquanto não funciona. Significado de negócio **pendente de esclarecimento com o cliente** — não presumir função.
 
 **Usuário**:

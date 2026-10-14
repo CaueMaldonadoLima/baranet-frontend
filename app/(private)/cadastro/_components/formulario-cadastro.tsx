@@ -51,6 +51,15 @@ import {
   validarFuncionario,
   type FuncionarioForm,
 } from "../_lib/funcionario-form";
+import {
+  basicosDoCliente,
+  basicosDoFornecedor,
+  basicosDoFuncionario,
+  clienteComBasicos,
+  fornecedorComBasicos,
+  funcionarioComBasicos,
+  pessoaDoDocumento,
+} from "../_lib/dados-basicos";
 
 // Cadastro especial (Loja / Usuário / Usuário Pagador / Banco) ainda não é
 // gravado: fica oculto até a regra ser definida (ver CONTEXT.md).
@@ -66,13 +75,9 @@ export const TIPOS_CADASTRO = [
 export type TipoCadastro = (typeof TIPOS_CADASTRO)[number]["value"];
 
 // Representante só se cadastra dentro da marca (aba Representantes, tela 18),
-// segundo o parceiro: o tipo fica oculto no "Cadastrar como" por enquanto.
-const MOSTRAR_TIPO_REPRESENTANTE = false;
-
-/** Tipos que o "Cadastrar como" oferece */
-export const TIPOS_VISIVEIS = TIPOS_CADASTRO.filter(
-  (t) => t.value !== "representante" || MOSTRAR_TIPO_REPRESENTANTE
-);
+// segundo o parceiro: escolher o tipo leva ao cadastro de marcas.
+export const REPRESENTANTE_SO_NA_MARCA = true;
+export const CADASTRO_DE_MARCA = "/cadastro/marcas/nova";
 
 /** Aba da ficha que lista cada tipo (o "Alterar" abre a busca nela) */
 const ABA_DA_FICHA: Record<TipoCadastro, string> = {
@@ -179,9 +184,26 @@ function FormularioCadastro({
   const atualizarCliente = (patch: Partial<ClienteForm>) => setCliente((prev) => ({ ...prev, ...patch }));
   // Num cadastro novo, trocar o tipo também troca física/jurídica para o padrão do tipo.
   function trocarTipo(tipo: TipoCadastro) {
-    if (editando) return;
+    if (editando || tipo === tipoCadastro) return;
+    if (tipo === "representante" && REPRESENTANTE_SO_NA_MARCA) {
+      toast.info("Representante é cadastrado na marca", "Inclua-o na aba Representantes do cadastro de marcas.");
+      router.push(CADASTRO_DE_MARCA);
+      return;
+    }
+    // Cada tipo tem o próprio formulário: leva o que já foi digitado.
+    const basicos =
+      tipoCadastro === "cliente"
+        ? basicosDoCliente(cliente)
+        : tipoCadastro === "funcionario"
+          ? basicosDoFuncionario(funcionario)
+          : basicosDoFornecedor(pessoa);
+    const tipoPessoa = pessoaDoDocumento(basicos.documento) ?? PESSOA_PADRAO[tipo];
+    if (tipo === "cliente") setCliente((prev) => clienteComBasicos(prev, basicos));
+    if (tipo === "funcionario")
+      setFuncionario((prev) => ({ ...funcionarioComBasicos(prev, basicos), pessoa: tipoPessoa }));
+    if (tipo === "fornecedor" || tipo === "representante")
+      setPessoa((prev) => ({ ...fornecedorComBasicos(prev, basicos), pessoa: tipoPessoa }));
     setTipoCadastro(tipo);
-    setPessoa((prev) => ({ ...prev, pessoa: PESSOA_PADRAO[tipo] }));
   }
 
   const atualizarPessoa = (patch: Partial<FornecedorForm>) => setPessoa((prev) => ({ ...prev, ...patch }));
@@ -287,7 +309,7 @@ function FormularioCadastro({
           <SelectValue placeholder="Selecione" />
         </SelectTrigger>
         <SelectContent>
-          {TIPOS_VISIVEIS.map((t) => (
+          {TIPOS_CADASTRO.map((t) => (
             <SelectItem key={t.value} value={t.value}>
               {t.label}
             </SelectItem>
