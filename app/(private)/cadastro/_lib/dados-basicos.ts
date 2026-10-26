@@ -1,5 +1,6 @@
+import type { Person, PersonRole } from "@/services/types";
 import type { ClienteForm } from "./cliente-form";
-import { apenasDigitos, type EnderecoForm } from "./comum";
+import { apenasDigitos, enderecoParaForm, type EnderecoForm } from "./comum";
 import type { FornecedorForm } from "./fornecedor-form";
 import type { FuncionarioForm } from "./funcionario-form";
 
@@ -111,5 +112,42 @@ export function funcionarioComBasicos(f: FuncionarioForm, b: DadosBasicos): Func
     email: ou(b.email, f.email),
     status: b.status,
     endereco: enderecoPreenchido(b.endereco) ? b.endereco : f.endereco,
+  };
+}
+
+// Reaproveitamento (cadastro novo): CPF/CNPJ que já é de uma Pessoa vira
+// convite para criar o papel nela (POST com personId), sem duplicar a pessoa.
+
+/** A busca por documento da API casa trechos: só vale o documento inteiro */
+export function pessoaComDocumento(pessoas: Person[], documento: string): Person | null {
+  const digitos = apenasDigitos(documento);
+  return pessoas.find((p) => apenasDigitos(p.document ?? "") === digitos) ?? null;
+}
+
+export type TipoComPapel = "cliente" | "fornecedor" | "funcionario";
+
+export const ROTULO_PAPEL: Record<PersonRole, string> = {
+  customer: "cliente",
+  supplier: "fornecedor",
+  employee: "funcionário",
+  doctor: "médico / optometrista",
+  agreement: "convênio",
+  representative: "representante",
+};
+
+/** Id do papel do tipo nesta pessoa (o da URL de edição), se ela já o tiver */
+export function idDoPapel(p: Person, tipo: TipoComPapel): number | null {
+  return tipo === "cliente" ? p.customerId : tipo === "fornecedor" ? p.supplierId : p.employeeId;
+}
+
+export function basicosDaPessoa(p: Person): DadosBasicos {
+  return {
+    documento: p.document ?? "",
+    nome: p.name,
+    ddd: p.ddd ?? "",
+    telefone: p.phone ?? p.whatsapp ?? "",
+    email: p.email ?? "",
+    status: p.status,
+    endereco: enderecoParaForm(p.address),
   };
 }
