@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Copy } from "lucide-react";
@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/shared/toast";
-import { customersService, employeesService, suppliersService } from "@/services/erp";
-import { ApiRequestError, mensagemDeErro } from "@/services/types";
+import { customersService, employeesService, peopleService, suppliersService } from "@/services/erp";
+import { ApiRequestError, mensagemDeErro, type Person } from "@/services/types";
+import { apenasDigitos } from "../_lib/comum";
 import { Campo } from "./campo";
 import { ClienteCompleto, ClienteRapido, ClienteRedesSociais } from "./cliente-campos";
 import { ClienteDadosComerciais, ClienteVinculos } from "./cliente-extras";
@@ -52,12 +53,16 @@ import {
   type FuncionarioForm,
 } from "../_lib/funcionario-form";
 import {
+  ROTULO_PAPEL,
+  basicosDaPessoa,
   basicosDoCliente,
   basicosDoFornecedor,
   basicosDoFuncionario,
   clienteComBasicos,
   fornecedorComBasicos,
   funcionarioComBasicos,
+  idDoPapel,
+  pessoaComDocumento,
   pessoaDoDocumento,
 } from "../_lib/dados-basicos";
 
@@ -147,6 +152,71 @@ function FormularioCadastro({
   // Funcionário criado sem senha: a API devolve o código de primeiro acesso uma
   // única vez. A tela só passa a editar o registro depois de fechar o aviso.
   const [primeiroAcesso, setPrimeiroAcesso] = useState<{ token: string; id: number } | null>(null);
+
+  // Reaproveitamento: num cadastro novo, um CPF/CNPJ que já é de uma Pessoa
+  // abre o aviso para usar o cadastro dela; o papel é criado com personId,
+  // sem duplicar a pessoa.
+  const [reaproveitada, setReaproveitada] = useState<Person | null>(null);
+  const [encontrada, setEncontrada] = useState<Person | null>(null);
+  /** "tipo:documento" que o usuário já recusou: não pergunta de novo */
+  const recusados = useRef(new Set<string>());
+  const tipoComPapel = tipoCadastro === "representante" ? null : tipoCadastro;
+  const digitosDocumento = apenasDigitos(
+    tipoCadastro === "cliente"
+      ? cliente.documento
+      : tipoCadastro === "funcionario"
+        ? funcionario.documento
+        : pessoa.documento
+  );
+  // Trocar o documento depois de aceitar desfaz o reaproveitamento.
+  const pessoaUsada =
+    reaproveitada && apenasDigitos(reaproveitada.document ?? "") === digitosDocumento ? reaproveitada : null;
+
+  useEffect(() => {
+    if (editando || tipoComPapel === null) return;
+    if (digitosDocumento.length !== 11 && digitosDocumento.length !== 14) return;
+    if (recusados.current.has(`${tipoComPapel}:${digitosDocumento}`)) return;
+    // Já aceita e sem este papel: segue usando, sem perguntar de novo.
+    if (pessoaUsada && idDoPapel(pessoaUsada, tipoComPapel) === null) return;
+    let ativo = true;
+    const espera = setTimeout(() => {
+      peopleService
+        .list({ document: digitosDocumento, per_page: 10 })
+        .then((res) => {
+          const existente = pessoaComDocumento(res.data, digitosDocumento);
+          if (ativo && existente) setEncontrada(existente);
+        })
+        // Sem aviso: o Gravar ainda mostra o erro de documento repetido.
+        .catch(() => {});
+    }, 400);
+    return () => {
+      ativo = false;
+      clearTimeout(espera);
+    };
+  }, [editando, tipoComPapel, digitosDocumento, pessoaUsada]);
+
+  function recusarExistente() {
+    if (encontrada && tipoComPapel) recusados.current.add(`${tipoComPapel}:${digitosDocumento}`);
+    setEncontrada(null);
+  }
+
+  function usarExistente() {
+    if (!encontrada) return;
+    const basicos = basicosDaPessoa(encontrada);
+    const tipoPessoa = encontrada.personType;
+    if (tipoCadastro === "cliente") setCliente((prev) => clienteComBasicos(prev, basicos));
+    if (tipoCadastro === "funcionario")
+      setFuncionario((prev) => ({ ...funcionarioComBasicos(prev, basicos), pessoa: tipoPessoa }));
+    if (tipoCadastro === "fornecedor")
+      setPessoa((prev) => ({ ...fornecedorComBasicos(prev, basicos), pessoa: tipoPessoa }));
+    setReaproveitada(encontrada);
+    setEncontrada(null);
+  }
+
+  /** No cadastro novo com pessoa reaproveitada, o papel é criado nela */
+  function naPessoaUsada<T extends object>(payload: T): T & { personId?: number } {
+    return !editando && pessoaUsada ? { ...payload, personId: pessoaUsada.id } : payload;
+  }
 
   useEffect(() => {
     if (id === null) return;
@@ -241,7 +311,9 @@ function FormularioCadastro({
       let tokenPrimeiroAcesso: string | undefined;
       if (tipoCadastro === "fornecedor") {
         const payload = formParaFornecedorWrite(pessoa, editando ? "editar" : "criar");
-        salvoId = (editando ? await suppliersService.update(id, payload) : await suppliersService.create(payload)).id;
+        salvoId = (
+          editando ? await suppliersService.update(id, payload) : await suppliersService.create(naPessoaUsada(payload))
+        ).id;
       } else if (tipoCadastro === "funcionario") {
         const payload = formParaFuncionarioWrite(funcionario, editando ? "editar" : "criar");
         if (editando) {
@@ -256,13 +328,15 @@ function FormularioCadastro({
             temSenha: salvo.hasPassword ?? prev.temSenha,
           }));
         } else {
-          const criado = await employeesService.create(payload);
+          const criado = await employeesService.create(naPessoaUsada(payload));
           salvoId = criado.id;
           tokenPrimeiroAcesso = criado.firstAccessToken;
         }
       } else {
         const payload = formParaClienteWrite(cliente, editando ? "editar" : "criar");
-        salvoId = (editando ? await customersService.update(id, payload) : await customersService.create(payload)).id;
+        salvoId = (
+          editando ? await customersService.update(id, payload) : await customersService.create(naPessoaUsada(payload))
+        ).id;
       }
       toast.success(editando ? `${rotuloTipo} atualizado.` : `${rotuloTipo} cadastrado com sucesso.`);
       if (tokenPrimeiroAcesso) {
@@ -284,6 +358,8 @@ function FormularioCadastro({
   }
 
   const lista = `/cadastro?aba=${ABA_DA_FICHA[tipoCadastro]}`;
+  const codigoExibido = codigoPessoa ?? pessoaUsada?.code ?? null;
+  const papelExistente = encontrada && tipoComPapel ? idDoPapel(encontrada, tipoComPapel) : null;
 
   function fecharPrimeiroAcesso() {
     if (!primeiroAcesso) return;
@@ -344,6 +420,11 @@ function FormularioCadastro({
           <Badge variant="muted">
             Alterando {rotuloTipo.toLowerCase()}
             {codigoPessoa !== null && ` nº ${codigoPessoa}`}
+          </Badge>
+        )}
+        {!editando && pessoaUsada && (
+          <Badge variant="info">
+            Usando o cadastro nº {pessoaUsada.code} ({pessoaUsada.name})
           </Badge>
         )}
       </div>
@@ -420,19 +501,19 @@ function FormularioCadastro({
           <Card className="px-6">
             <FormSection title="Cadastro rápido">
               {tipoCadastro === "cliente" ? (
-                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={codigoPessoa} seletorTipo={seletorTipo} />
+                <ClienteRapido form={cliente} atualizar={atualizarCliente} codigo={codigoExibido} seletorTipo={seletorTipo} />
               ) : tipoCadastro === "funcionario" ? (
                 <FuncionarioRapido
                   form={funcionario}
                   atualizar={atualizarFuncionario}
-                  codigo={codigoPessoa}
+                  codigo={codigoExibido}
                   seletorTipo={seletorTipo}
                 />
               ) : (
                 <PessoaRapido
                   form={pessoa}
                   atualizar={atualizarPessoa}
-                  codigo={codigoPessoa}
+                  codigo={codigoExibido}
                   camposFiscais={tipoCadastro === "fornecedor"}
                   seletorTipo={seletorTipo}
                 />
@@ -504,6 +585,46 @@ function FormularioCadastro({
         </div>
         <ModalFooter>
           <Button onClick={fecharPrimeiroAcesso}>Já anotei</Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal
+        open={encontrada !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) recusarExistente();
+        }}
+        title={papelExistente !== null ? `${rotuloTipo} já cadastrado` : "CPF / CNPJ já cadastrado"}
+        description={
+          encontrada
+            ? papelExistente !== null
+              ? `${encontrada.name} (código ${encontrada.code}) já está cadastrado como ${rotuloTipo.toLowerCase()}.`
+              : `${encontrada.name} (código ${encontrada.code}) já está no sistema${
+                  encontrada.roles.length
+                    ? ` como ${encontrada.roles.map((r) => ROTULO_PAPEL[r]).join(", ")}`
+                    : ""
+                }. Usar este cadastro? O ${rotuloTipo.toLowerCase()} fica ligado à mesma pessoa, com os dados dela.`
+            : undefined
+        }
+        size="md"
+      >
+        <ModalFooter>
+          {papelExistente !== null ? (
+            <>
+              <Button variant="outline" onClick={recusarExistente}>
+                Fechar
+              </Button>
+              <Button asChild>
+                <Link href={`/cadastro/${tipoCadastro}/${papelExistente}`}>Abrir cadastro existente</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={recusarExistente}>
+                Não usar
+              </Button>
+              <Button onClick={usarExistente}>Usar este cadastro</Button>
+            </>
+          )}
         </ModalFooter>
       </Modal>
     </div>
