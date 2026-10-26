@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useRef, useState, type FormEvent } from "react";
+import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AlertCircle, List, Plus, Search, Settings, Tag } from "lucide-react";
 import { DataTable, type Column } from "@/components/shared/data-table";
@@ -70,10 +70,13 @@ const CAMPOS_BUSCA = [
 
 type CampoBusca = (typeof CAMPOS_BUSCA)[number]["key"];
 
+/** Sem campo, a aba lista todos os cadastros do papel, sem filtro */
 interface Busca {
-  campo: CampoBusca;
+  campo: CampoBusca | null;
   termo: string;
 }
+
+const SEM_FILTRO: Busca = { campo: null, termo: "" };
 
 // Entrada do cadastro: busca + lista. ?aba=<aba> abre a ficha naquela aba (o
 // "Alterar" e o "Cancelar" do formulário voltam para cá).
@@ -94,11 +97,11 @@ export default function FichaCadastroPage({
   const [os, setOs] = useState("");
   const [nf, setNf] = useState("");
 
-  const [busca, setBusca] = useState<Busca | null>(null);
+  const [busca, setBusca] = useState<Busca>(SEM_FILTRO);
   const [resultados, setResultados] = useState<Person[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
   const [mostrarResultados, setMostrarResultados] = useState(true);
   const [selecionado, setSelecionado] = useState<Person | null>(null);
@@ -116,7 +119,7 @@ export default function FichaCadastroPage({
     setMostrarResultados(true);
     try {
       const res = await peopleService.list({
-        [novaBusca.campo]: novaBusca.termo,
+        ...(novaBusca.campo ? { [novaBusca.campo]: novaBusca.termo } : {}),
         role,
         page: pagina,
       });
@@ -134,13 +137,22 @@ export default function FichaCadastroPage({
     }
   }
 
+  // Ao abrir, a aba já lista todos os cadastros do papel.
+  useEffect(() => {
+    executarBusca(SEM_FILTRO, 1);
+    // Só na montagem: depois, a aba e os filtros refazem a busca.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Campo vazio volta à lista completa da aba.
   function handleBuscar(campo: CampoBusca) {
     const termo = campos[campo].trim();
-    if (!termo) {
-      toast.warning("Digite algo para buscar.");
-      return;
-    }
-    executarBusca({ campo, termo }, 1);
+    executarBusca(termo ? { campo, termo } : SEM_FILTRO, 1);
+  }
+
+  function limparFiltro() {
+    setCampos({ name: "", document: "", whatsapp: "" });
+    executarBusca(SEM_FILTRO, 1);
   }
 
   function handleBuscarDocumentoFiscal(tipo: "OS" | "NF", valor: string) {
@@ -159,7 +171,7 @@ export default function FichaCadastroPage({
   function handleTrocarAba(value: string) {
     const novaAba = value as Aba;
     setAba(novaAba);
-    if (busca) executarBusca(busca, 1, novaAba);
+    executarBusca(busca, 1, novaAba);
   }
 
   function handleSelecionar(row: Person) {
@@ -217,7 +229,7 @@ export default function FichaCadastroPage({
     },
   ];
 
-  const campoBuscado = busca && CAMPOS_BUSCA.find((c) => c.key === busca.campo)!;
+  const campoBuscado = busca.campo ? CAMPOS_BUSCA.find((c) => c.key === busca.campo)! : null;
   const edicaoSelecionado = selecionado && linkEdicao(selecionado, aba);
 
   return (
@@ -324,7 +336,6 @@ export default function FichaCadastroPage({
             variant="ghost"
             aria-label="Mostrar resultados da busca"
             aria-pressed={mostrarResultados}
-            disabled={busca === null}
             onClick={() => setMostrarResultados((v) => !v)}
           >
             <List className="size-4" />
@@ -351,14 +362,21 @@ export default function FichaCadastroPage({
           )}
         </div>
 
-        {busca !== null && campoBuscado && mostrarResultados && (
+        {mostrarResultados && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {abaAtual.role
-                ? `Pessoas com papel ${abaAtual.label.toLowerCase()}`
-                : "Todas as pessoas"}{" "}
-              — {campoBuscado.label}: “{busca.termo}”
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <p>
+                {abaAtual.role
+                  ? `Pessoas com papel ${abaAtual.label.toLowerCase()}`
+                  : "Todas as pessoas"}
+                {campoBuscado && ` — ${campoBuscado.label}: “${busca.termo}”`}
+              </p>
+              {campoBuscado && (
+                <Button size="xs" variant="ghost" onClick={limparFiltro}>
+                  Limpar filtro
+                </Button>
+              )}
+            </div>
             {erroBusca ? (
               <EmptyState
                 icon={AlertCircle}
@@ -374,7 +392,9 @@ export default function FichaCadastroPage({
                 keyExtractor={(row) => row.id}
                 isLoading={loading}
                 emptyTitle="Nenhum cadastro encontrado"
-                emptyDescription="Tente outro termo, outra aba ou use “Incluir novo”."
+                emptyDescription={
+                  campoBuscado ? "Tente outro termo, outra aba ou use “Incluir novo”." : "Use “Incluir novo” para cadastrar."
+                }
               />
             )}
             {!erroBusca && totalPages > 1 && (
@@ -404,7 +424,7 @@ export default function FichaCadastroPage({
                 <EmptyState
                   icon={Search}
                   title="Nenhum cadastro selecionado"
-                  description="Busque pelo nome, código, CPF/CNPJ ou Whatsapp e selecione um resultado."
+                  description="Selecione um cadastro na lista acima ou filtre pelo nome, código, CPF/CNPJ ou Whatsapp."
                 />
               ) : a.role && !selecionado.roleFlags[a.role] ? (
                 <EmptyState
