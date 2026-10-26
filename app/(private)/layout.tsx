@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Inter } from "next/font/google";
 import "../globals.css";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,6 @@ import {
   FlaskConical,
   LogOut,
   ChevronDown,
-  Glasses,
 } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -98,12 +98,7 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
               activeItemClassName="bg-sidebar-active-bg text-sidebar-active-foreground"
               inactiveItemClassName="bg-sidebar-bg text-white hover:brightness-110"
               showActiveChevron
-              uppercaseLogo
-              logoMark={
-                <span className="flex size-8 items-center justify-center rounded-lg bg-white text-sidebar-bg shrink-0">
-                  <Glasses className="size-4.5" aria-hidden />
-                </span>
-              }
+              logo={<Image src="/logo-baranet.png" alt="Baranet" width={1582} height={361} priority className="h-7 w-auto" />}
             />
             <div className="flex flex-col w-full bg-zinc-100 rounded-l-2xl min-h-0 overflow-hidden">
               <Topbar showUserMenu={false} />

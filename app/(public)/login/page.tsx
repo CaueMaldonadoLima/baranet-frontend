@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, Lock, Mail, Store } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function LogInPage() {
@@ -28,11 +29,9 @@ export default function LogInPage() {
         <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex flex-col items-center gap-3 mb-8">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-white/20 border border-white/30">
-              <Store className="size-7 text-white" />
-            </div>
+            <Image src="/logo-baranet.png" alt="" width={1582} height={361} priority className="h-10 w-auto" />
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-white">Baranet ERP</h1>
+              <h1 className="sr-only">Baranet ERP</h1>
               <p className="text-white/60 text-sm mt-0.5">Gestão para redes de óticas</p>
             </div>
           </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Inter } from "next/font/google";
 import "../../globals.css";
 import { cn } from "@/lib/utils";
@@ -64,6 +65,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Sidebar
               appName="Baranet"
+              logo={<Image src="/logo-baranet.png" alt="Baranet" width={1582} height={361} priority className="h-7 w-auto" />}
               appArea="Admin"
               navGroups={ADMIN_NAV}
             />
