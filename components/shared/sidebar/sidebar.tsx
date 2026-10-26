@@ -31,6 +31,8 @@ interface SidebarProps {
   showActiveChevron?: boolean;
   logoMark?: React.ReactNode;
   uppercaseLogo?: boolean;
+  /** Logo completa (imagem): substitui o logoMark e o appName escrito */
+  logo?: React.ReactNode;
 }
 
 function NavLink({
@@ -87,6 +89,7 @@ export function Sidebar({
   showActiveChevron,
   logoMark,
   uppercaseLogo,
+  logo,
 }: SidebarProps) {
   return (
     <aside
@@ -98,7 +101,7 @@ export function Sidebar({
       {/* Brand */}
       <div className="flex flex-col gap-6 min-h-0">
         <div className="px-3 flex items-center gap-2">
-          {logoMark}
+          {!logo && logoMark}
           <div>
             <h1
               className={cn(
@@ -106,7 +109,7 @@ export function Sidebar({
                 uppercaseLogo && "uppercase"
               )}
             >
-              {appName}
+              {logo ?? appName}
             </h1>
             {appArea && (
               <p className="text-white/50 text-xs mt-1 uppercase tracking-widest font-medium">
